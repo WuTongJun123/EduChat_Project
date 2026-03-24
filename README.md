@@ -54,7 +54,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/your-username/EduChat_Project.git
+git clone https://github.com/WuTongJun123/EduChat_Project.git
 cd EduChat_Project
 ```
 ### 2. 下载模型
