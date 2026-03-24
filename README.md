@@ -56,3 +56,43 @@
 ```bash
 git clone https://github.com/your-username/EduChat_Project.git
 cd EduChat_Project
+
+### 2. 下载模型
+模型文件约 15 GB，请确保磁盘空间充足。
+
+- 使用 Hugging Face 命令行工具：
+  ```bash
+  pip install huggingface_hub
+  huggingface-cli download ecnu-icalk/educhat-r1-001-8b-qwen3.0 --local-dir ./models/educhat-r1-001-8b-qwen3.0
+- 国内用户可使用镜像加速：
+  ```bash
+  export HF_ENDPOINT=https://hf-mirror.com
+  huggingface-cli download ecnu-icalk/educhat-r1-001-8b-qwen3.0 --local-dir ./models/educhat-r1-001-8b-qwen3.0
+
+### 3. 配置后端
+进入 `backend` 目录，安装依赖：
+```bash
+cd backend
+pip install -r requirements.txt
+
+### 4. 配置前端
+进入 `frontend` 目录，安装依赖并构建：
+
+```bash
+cd ../frontend
+npm install
+npm run build
+
+### 5. 启动服务
+#### 方式一：生产模式（后端托管前端）
+```bash
+cd ../backend
+python main.py
+
+#### 方式二：开发模式（前后端分离）
+```bash
+cd backend
+python main.py
+```bash
+cd frontend
+npm run dev
