@@ -103,3 +103,104 @@ python main.py
 cd frontend
 npm run dev
 ```
+
+#### 方式三：一键启动（Windows）
+在项目根目录创建 start.bat：
+```bash
+@echo off
+echo 启动后端服务...
+start cmd /k "cd backend && python main.py"
+timeout /t 3 /nobreak >nul
+echo 启动前端服务...
+start cmd /k "cd frontend && npm run dev"
+echo 前后端启动完成，请访问 http://localhost:5173
+```
+双击运行即可。
+
+---
+
+## 📖 使用说明
+
+1. 打开浏览器，访问 `http://localhost:8000`（或 `http://localhost:5173`）。
+2. 在文本框中粘贴作业内容，或点击“上传文件”选择 `.txt`、`.py`、`.jpg`、`.png` 文件。
+3. 调节“详细程度”滑块控制批改结果的详细程度（最大 token 数）。
+4. 点击 **“开始批改”**，稍等片刻即可看到流式输出的批改结果，包含：
+   - 思考过程（思维链）
+   - 整体评价
+   - 错误分析（逐条列出）
+   - 评分（百分制）
+   - 学习建议
+   - 鼓励性结尾
+
+### 样例作业（可复制测试）
+
+**语文作文**  
+> 《我的理想》  
+> 每个人都有自己的理想，我的理想是成为一名科学家。因为科学家可以发明很多有用的东西，帮助人们生活得更好。我会努力学习，将来实现这个理想。
+
+**数学解答**  
+> 计算 1+2+3+…+100 的和，并写出步骤。  
+> 1+2+3+…+100 = 5050  
+> 步骤：高斯公式 (1+100)×100÷2 = 5050
+
+**Python 代码**  
+```python
+def factorial(n):
+    if n == 0:
+        return 1
+    else:
+        return n * factorial(n-1)
+print(factorial(5))
+```
+
+---
+
+## 🔌 API 文档
+
+启动后端后，访问 `http://localhost:8000/docs` 可查看自动生成的 Swagger UI 文档。
+
+### 主要接口
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/grade/sync` | 同步批改，返回完整结果（JSON） |
+| POST | `/api/grade/stream` | 流式批改，返回 Server-Sent Events |
+| POST | `/api/grade/file` | 文件上传批改 |
+| GET  | `/api/health`  | 健康检查 |
+
+### 请求示例
+
+**同步批改**：
+```bash
+curl -X POST "http://localhost:8000/api/grade/sync" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "请批改这篇作文：我的理想...", "max_tokens": 1024}'
+```
+
+**文件上传批改**：
+```bash
+curl -X POST "http://localhost:8000/api/grade/file" \
+  -F "file=@/path/to/homework.txt" \
+  -F "max_tokens=1024"
+```
+
+**响应格式**：
+```json
+{
+  "result": "整体评价：...\n错误分析：...\n评分：85\n学习建议：...\n鼓励性结尾：..."
+}
+```
+
+---
+
+## 📄 许可证
+
+本项目基于 **Apache 2.0** 协议开源，您可以自由使用、修改和分发，但需保留版权声明并说明修改情况。  
+模型 **EduChat-R1** 的版权归华东师范大学所有，使用时请遵守其官方许可证（详见 [Hugging Face 模型页](https://huggingface.co/ecnu-icalk/educhat-r1-001-8b-qwen3.0)）。
+
+**Apache 2.0 许可摘要**：
+- ✅ 允许商用
+- ✅ 允许修改
+- ✅ 允许分发
+- ⚠️ 需保留版权和许可声明
+- ⚠️ 修改需注明变更
