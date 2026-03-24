@@ -8,7 +8,7 @@
 > 基于 EduChat-R1 教育大模型的自动化作业批改平台，支持多学科、多模态输入，提供流式反馈与智能评分。
 
 <div align="center">
-  <img src="docs/demo.gif" width="90%">
+  <img src="docs/demo.png" width="90%">
 </div>
 
 ---
