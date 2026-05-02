@@ -28,7 +28,7 @@
 | 层级       | 技术选型                                                                 |
 |------------|--------------------------------------------------------------------------|
 | 前端       | Vue3、Element Plus、Vite、Axios                                          |
-| 后端       | FastAPI, Uvicorn, Pydantic                                            |
+| 后端       | FastAPI、 Uvicorn、 Pydantic                                            |
 | 模型       | EduChat-R1-8B（华东师范大学开源教育大模型，支持4-bit量化）                |
 | OCR       | PaddleOCR                                                              |
 | 部署       | AutoDL GPU 云服务 / 本地部署                                            |
