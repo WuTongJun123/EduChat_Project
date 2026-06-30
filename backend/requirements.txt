@@ -1,0 +1,11 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+torch>=2.0.0
+transformers>=4.36.0
+accelerate>=0.25.0
+bitsandbytes>=0.41.0   # 4-bit 量化需要
+python-multipart       # 文件上传支持
+pillow>=9.0.0          # 图片处理
+paddlepaddle>=2.5.0    # 可选，OCR 需要
+paddleocr>=2.7.0       # 可选
