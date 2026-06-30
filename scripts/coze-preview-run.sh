@@ -6,24 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-# 显式声明关键环境变量
-export PORT=5000
+# 从环境变量读取端口（沙箱规范）
+PORT="${DEPLOY_RUN_PORT:-5000}"
 
-# 清理 5000 端口残留进程（幂等）
-fuser -k 5000/tcp 2>/dev/null || true
-sleep 1
+echo "🚀 启动 EduChat 预览服务在端口 $PORT"
 
-# 使用后端 Python 静态文件服务器在 5000 端口提供前端预览
+# 启动后端 FastAPI 服务（同时提供 API 和前端静态文件）
 cd backend
-exec python -c "
-import http.server
-import socketserver
-import os
-
-PORT = 5000
-os.chdir('../frontend/dist')
-Handler = http.server.SimpleHTTPRequestHandler
-with socketserver.TCPServer(('', PORT), Handler) as httpd:
-    print(f'Serving at http://0.0.0.0:{PORT}')
-    httpd.serve_forever()
-"
+exec python main.py

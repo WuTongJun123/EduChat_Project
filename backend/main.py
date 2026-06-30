@@ -73,4 +73,7 @@ app.include_router(api_router)
 app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # 从环境变量读取端口（适配沙箱环境）
+    port = int(os.environ.get("DEPLOY_RUN_PORT", 8000))
+    print(f"🚀 EduChat 服务启动在端口 {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
