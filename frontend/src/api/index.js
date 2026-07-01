@@ -81,4 +81,46 @@ export const getCurrentStats = () => {
   return api.get('/analytics/current-stats')
 }
 
+// ==================== Rubric 评分标准API ====================
+
+// 获取评分标准列表
+export const getRubricList = (subject) => {
+  return api.get('/rubric/list', subject ? { params: { subject } } : {})
+}
+
+// 获取单个评分标准详情
+export const getRubricDetail = (rubricId) => {
+  return api.get(`/rubric/${rubricId}`)
+}
+
+// 创建评分标准
+export const createRubric = (data) => {
+  return api.post('/rubric', data)
+}
+
+// 更新评分标准
+export const updateRubric = (rubricId, data) => {
+  return api.put(`/rubric/${rubricId}`, data)
+}
+
+// 删除评分标准
+export const deleteRubric = (rubricId) => {
+  return api.delete(`/rubric/${rubricId}`)
+}
+
+// 获取预设模板
+export const getRubricTemplates = () => {
+  return api.get('/rubric/templates/list')
+}
+
+// 克隆预设模板
+export const cloneRubricTemplate = (templateId, newName) => {
+  return api.post(`/rubric/templates/${templateId}/clone`, null, { params: { new_name: newName } })
+}
+
+// 使用评分标准批改作业
+export const gradeWithRubric = (rubricId, content, studentId) => {
+  return api.post(`/rubric/${rubricId}/grade`, { content, student_id: studentId })
+}
+
 export default api
