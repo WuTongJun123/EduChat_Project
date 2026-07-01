@@ -12,6 +12,7 @@ from models import grade_sync, grade_stream
 from utils import extract_text_from_file
 from analytics import analytics_engine
 from rubric import rubric_engine
+from research import research_engine
 
 app = FastAPI(title="EduChat 作业批改 API")
 
@@ -236,6 +237,120 @@ async def grade_with_rubric_api(rubric_id: str, req: RubricGradeRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["errors"])
     return result
+
+# ==================== 科研评估 API ====================
+
+# --- 一致性评估 ---
+class ConsistencyEvalRequest(BaseModel):
+    ai_scores: List[float]
+    human_scores: List[float]
+    evaluator_name: str = "人工评分"
+    task_name: str = "未命名评估"
+
+@api_router.get("/research/overview")
+async def get_research_overview_api():
+    """科研数据总览"""
+    return research_engine.get_research_overview()
+
+@api_router.post("/research/consistency/evaluate")
+async def run_consistency_eval_api(req: ConsistencyEvalRequest):
+    """执行评分一致性评估"""
+    result = research_engine.run_consistency_evaluation(
+        req.ai_scores, req.human_scores, req.evaluator_name, req.task_name
+    )
+    return result
+
+@api_router.get("/research/consistency/demo")
+async def get_consistency_demo_api(count: int = 30):
+    """生成演示一致性评估数据"""
+    return research_engine.generate_demo_consistency_data(count)
+
+@api_router.get("/research/consistency/list")
+async def list_consistency_evals_api():
+    """列出所有一致性评估记录"""
+    return {"records": research_engine.consistency_records, "total": len(research_engine.consistency_records)}
+
+# --- A/B 测试 ---
+class ABTestRequest(BaseModel):
+    name: str
+    description: str = ""
+    config_a: Dict[str, Any]
+    config_b: Dict[str, Any]
+    test_samples: List[Dict[str, Any]]
+
+@api_router.post("/research/ab-test/create")
+async def create_ab_test_api(req: ABTestRequest):
+    """创建A/B测试实验"""
+    result = research_engine.create_experiment(
+        req.name, req.description, req.config_a, req.config_b, req.test_samples
+    )
+    return result
+
+@api_router.get("/research/ab-test/list")
+async def list_ab_tests_api():
+    """列出所有实验"""
+    return {"experiments": research_engine.list_experiments()}
+
+@api_router.get("/research/ab-test/{exp_id}")
+async def get_ab_test_api(exp_id: str):
+    """获取实验详情"""
+    exp = research_engine.get_experiment(exp_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="实验不存在")
+    return exp
+
+# --- 置信度评估 ---
+class ConfidenceRequest(BaseModel):
+    content: str
+    score: float
+    rubric_id: Optional[str] = None
+
+@api_router.post("/research/confidence")
+async def calculate_confidence_api(req: ConfidenceRequest):
+    """评分置信度分析"""
+    return research_engine.calculate_confidence(req.content, req.score, req.rubric_id)
+
+# --- Prompt 工程实验台 ---
+class PromptVariantRequest(BaseModel):
+    name: str
+    system_prompt: str
+    description: str = ""
+
+class PromptTestRequest(BaseModel):
+    test_content: str
+    reference_score: Optional[float] = None
+
+@api_router.get("/research/prompts/list")
+async def list_prompts_api():
+    """列出所有Prompt变体"""
+    return {"variants": research_engine.list_prompt_variants()}
+
+@api_router.post("/research/prompts/create")
+async def create_prompt_api(req: PromptVariantRequest):
+    """创建Prompt变体"""
+    return research_engine.create_prompt_variant(req.name, req.system_prompt, req.description)
+
+@api_router.post("/research/prompts/{prompt_id}/test")
+async def test_prompt_api(prompt_id: str, req: PromptTestRequest):
+    """测试单个Prompt变体"""
+    result = research_engine.test_prompt(prompt_id, req.test_content, req.reference_score)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result
+
+class PromptCompareRequest(BaseModel):
+    prompt_ids: List[str]
+
+@api_router.post("/research/prompts/compare")
+async def compare_prompts_api(req: PromptCompareRequest):
+    """对比多个Prompt变体"""
+    return research_engine.compare_prompts(req.prompt_ids)
+
+# --- 数据导出 ---
+@api_router.post("/research/export")
+async def export_data_api(data_type: str = "all", format: str = "csv"):
+    """导出实验数据"""
+    return research_engine.export_experiment_data(data_type, format)
 
 app.include_router(api_router)
 app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")

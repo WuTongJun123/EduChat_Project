@@ -124,3 +124,71 @@ export const gradeWithRubric = (rubricId, content, studentId) => {
 }
 
 export default api
+
+// ==================== 科研评估 API ====================
+
+// 科研数据总览
+export const getResearchOverview = () => {
+  return api.get('/research/overview')
+}
+
+// 一致性评估
+export const runConsistencyEval = (aiScores, humanScores, evaluatorName, taskName) => {
+  return api.post('/research/consistency/evaluate', {
+    ai_scores: aiScores,
+    human_scores: humanScores,
+    evaluator_name: evaluatorName,
+    task_name: taskName
+  })
+}
+
+export const getConsistencyDemo = (count = 30) => {
+  return api.get('/research/consistency/demo', { params: { count } })
+}
+
+export const listConsistencyEvals = () => {
+  return api.get('/research/consistency/list')
+}
+
+// A/B 测试
+export const createABTest = (data) => {
+  return api.post('/research/ab-test/create', data)
+}
+
+export const listABTests = () => {
+  return api.get('/research/ab-test/list')
+}
+
+export const getABTestDetail = (expId) => {
+  return api.get(`/research/ab-test/${expId}`)
+}
+
+// 置信度评估
+export const calculateConfidence = (content, score, rubricId) => {
+  return api.post('/research/confidence', { content, score, rubric_id: rubricId })
+}
+
+// Prompt 工程实验台
+export const listPromptVariants = () => {
+  return api.get('/research/prompts/list')
+}
+
+export const createPromptVariant = (name, systemPrompt, description) => {
+  return api.post('/research/prompts/create', { name, system_prompt: systemPrompt, description })
+}
+
+export const testPrompt = (promptId, testContent, referenceScore) => {
+  return api.post(`/research/prompts/${promptId}/test`, {
+    test_content: testContent,
+    reference_score: referenceScore
+  })
+}
+
+export const comparePrompts = (promptIds) => {
+  return api.post('/research/prompts/compare', { prompt_ids: promptIds })
+}
+
+// 数据导出
+export const exportResearchData = (dataType = 'all', format = 'csv') => {
+  return api.post('/research/export', null, { params: { data_type: dataType, format } })
+}

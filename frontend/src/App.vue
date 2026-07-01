@@ -8,6 +8,7 @@
             <el-radio-button value="grade">作业批改</el-radio-button>
             <el-radio-button value="rubric">评分标准</el-radio-button>
             <el-radio-button value="analytics">数据分析</el-radio-button>
+            <el-radio-button value="research">科研评估</el-radio-button>
           </el-radio-group>
         </div>
         <div class="header-info">
@@ -21,6 +22,7 @@
       <GradePanel v-if="currentModule === 'grade'" />
       <RubricManager v-if="currentModule === 'rubric'" />
       <AnalyticsDashboard v-if="currentModule === 'analytics'" />
+      <ResearchConsole v-if="currentModule === 'research'" />
     </div>
   </div>
 </template>
@@ -30,6 +32,7 @@ import { ref } from 'vue'
 import GradePanel from './components/GradePanel.vue'
 import RubricManager from './components/RubricManager.vue'
 import AnalyticsDashboard from './components/AnalyticsDashboard.vue'
+import ResearchConsole from './components/ResearchConsole.vue'
 
 const currentModule = ref('grade')
 </script>
