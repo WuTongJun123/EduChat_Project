@@ -6,6 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
-# 启动后端服务（托管前端静态文件，监听 5000 端口）
+# 从环境变量读取端口（沙箱规范）
+PORT="${DEPLOY_RUN_PORT:-5000}"
+
+echo "🚀 启动 EduChat 生产服务在端口 $PORT"
+
+# 启动后端服务（托管前端静态文件）
 cd backend
-exec uvicorn main:app --host 0.0.0.0 --port 5000
+exec uvicorn main:app --host 0.0.0.0 --port $PORT

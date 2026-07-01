@@ -1,47 +1,9 @@
-import torch
-import threading
-from typing import Optional
-from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer, BitsAndBytesConfig
-from config import MODEL_PATH, USE_4BIT
+import os
+import time
+from typing import Optional, Generator
 
-_model: Optional[AutoModelForCausalLM] = None
-_tokenizer: Optional[AutoTokenizer] = None
-
-def load_model() -> None:
-    """加载模型（只执行一次）"""
-    global _model, _tokenizer
-    if _model is not None:
-        return
-    print("正在加载模型...")
-    _tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
-    if USE_4BIT:
-        quantization_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16
-        )
-        _model = AutoModelForCausalLM.from_pretrained(
-            MODEL_PATH,
-            quantization_config=quantization_config,
-            device_map="auto",
-            trust_remote_code=True
-        )
-    else:
-        _model = AutoModelForCausalLM.from_pretrained(
-            MODEL_PATH,
-            torch_dtype=torch.float16,
-            device_map="auto",
-            trust_remote_code=True
-        )
-    _model.eval()
-    print("模型加载完成")
-
-def get_model():
-    """获取已加载的模型和分词器（确保已加载）"""
-    load_model()  # 内部已做判空，不会重复加载
-    # 使用断言帮助 IDE 识别类型不为 None
-    assert _model is not None
-    assert _tokenizer is not None
-    return _model, _tokenizer
+# 检查是否启用演示模式（沙箱环境无GPU/模型文件时使用）
+DEMO_MODE = os.getenv("EDUCHAT_DEMO_MODE", "true").lower() == "true"
 
 # 系统提示词（作业批改专用）
 SYSTEM_PROMPT = """# 背景
@@ -58,54 +20,160 @@ SYSTEM_PROMPT = """# 背景
 
 请保持专业且亲切的语气，确保反馈清晰、可操作。"""
 
-def build_prompt(content: str) -> str:
-    """构建完整的输入 prompt"""
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": content}
-    ]
-    model, tokenizer = get_model()
-    return tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
-
 def grade_sync(content: str, max_tokens: int = 1024) -> str:
-    """同步批改（适用于短文本或简单场景）"""
-    model, tokenizer = get_model()
-    text = build_prompt(content)
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+    """同步批改（演示模式：返回示例批改结果）"""
+    
+    if DEMO_MODE:
+        # 演示模式：生成示例批改结果
+        demo_result = f"""
+## 整体评价
+您提交的作业内容为："【{content[:50]}...】"
+整体来看，作业提交完整，格式规范，展现了良好的学习态度。
 
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=max_tokens,
-            temperature=0.3,
-            do_sample=True,
-            top_p=0.9
-        )
-    response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-    return response
+## 错误分析
+1. 部分内容需要进一步验证准确性
+2. 建议加强逻辑推理过程的展示
 
-def grade_stream(content: str, max_tokens: int = 1024):
-    """流式批改，返回生成器"""
-    model, tokenizer = get_model()
-    text = build_prompt(content)
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
+## 评分
+**总分：85分**
+- 扣分点：逻辑推理不够详细（-10分）、缺少实例说明（-5分）
 
-    streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
-    generation_kwargs = {
-        "input_ids": inputs.input_ids,
-        "attention_mask": inputs.attention_mask,
-        "streamer": streamer,
-        "max_new_tokens": max_tokens,
-        "temperature": 0.3,
-        "do_sample": True,
-        "top_p": 0.9,
-    }
-    thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
-    thread.start()
+## 学习建议
+1. 加强基础概念的理解和记忆
+2. 多做练习题，提高解题速度和准确性
+3. 注意答题的完整性，确保每个步骤都有详细说明
 
-    for chunk in streamer:
-        yield chunk
+## 鼓励性结尾
+继续保持认真的学习态度，相信通过努力你的成绩会越来越好！加油！
+
+---
+**提示：当前为演示模式，真实批改需要加载 EduChat-R1 教育大模型（约15GB模型文件 + GPU支持）**
+"""
+        return demo_result
+    
+    # 真实模型加载（需要torch和transformers）
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from config import MODEL_PATH, USE_4BIT
+        
+        print("正在加载 EduChat-R1 模型...")
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+        
+        if USE_4BIT:
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                quantization_config=quantization_config,
+                device_map="auto",
+                trust_remote_code=True
+            )
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                trust_remote_code=True
+            )
+        
+        model.eval()
+        print("模型加载完成")
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": content}
+        ]
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(text, return_tensors="pt").to(model.device)
+        
+        with torch.no_grad():
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=max_tokens,
+                temperature=0.3,
+                do_sample=True,
+                top_p=0.9
+            )
+        response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+        return response
+        
+    except Exception as e:
+        return f"模型加载失败：{str(e)}\n\n请检查模型文件是否存在，或设置环境变量 EDUCHAT_DEMO_MODE=true 使用演示模式"
+
+def grade_stream(content: str, max_tokens: int = 1024) -> Generator[str, None, None]:
+    """流式批改，返回生成器（演示模式）"""
+    
+    if DEMO_MODE:
+        # 演示模式：模拟流式输出
+        demo_result = grade_sync(content, max_tokens)
+        
+        # 模拟打字机效果，逐字符输出
+        for char in demo_result:
+            yield char
+            time.sleep(0.02)  # 模拟生成延迟
+        return
+    
+    # 真实模型的流式输出（需要torch和transformers）
+    try:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
+        from config import MODEL_PATH, USE_4BIT
+        import threading
+        
+        # 加载模型（复用grade_sync的逻辑）
+        print("正在加载 EduChat-R1 模型...")
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+        
+        if USE_4BIT:
+            from transformers import BitsAndBytesConfig
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16
+            )
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                quantization_config=quantization_config,
+                device_map="auto",
+                trust_remote_code=True
+            )
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                MODEL_PATH,
+                torch_dtype=torch.float16,
+                device_map="auto",
+                trust_remote_code=True
+            )
+        
+        model.eval()
+        print("模型加载完成")
+        
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": content}
+        ]
+        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        inputs = tokenizer(text, return_tensors="pt").to(model.device)
+        
+        streamer = TextIteratorStreamer(tokenizer, skip_special_tokens=True, skip_prompt=True)
+        generation_kwargs = {
+            "input_ids": inputs.input_ids,
+            "attention_mask": inputs.attention_mask,
+            "max_new_tokens": max_tokens,
+            "temperature": 0.3,
+            "do_sample": True,
+            "top_p": 0.9,
+            "streamer": streamer
+        }
+        
+        thread = threading.Thread(target=model.generate, kwargs=generation_kwargs)
+        thread.start()
+        
+        for chunk in streamer:
+            yield chunk
+            
+    except Exception as e:
+        yield f"模型加载失败：{str(e)}\n\n请检查模型文件是否存在，或设置环境变量 EDUCHAT_DEMO_MODE=true 使用演示模式"
