@@ -9,3 +9,4 @@ python-multipart       # 文件上传支持
 pillow>=9.0.0          # 图片处理
 paddlepaddle>=2.5.0    # 可选，OCR 需要
 paddleocr>=2.7.0       # 可选
+python-dotenv>=1.0.0   # .env 环境变量加载
