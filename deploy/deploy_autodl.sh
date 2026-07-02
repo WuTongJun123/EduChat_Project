@@ -112,27 +112,24 @@ fi
 if [ ! -d "${MODEL_DIR}" ] || [ -z "$(ls -A ${MODEL_DIR} 2>/dev/null)" ]; then
     print_info "开始下载 EduChat-R1 模型（约 15GB）..."
     print_info "模型: ecnu-icalk/educhat-r1-001-8b-qwen3.0 (基于 Qwen3.0 8B)"
-    print_info "优先使用 ModelScope（国内速度快）..."
+    print_info "使用 hf-mirror 国内镜像下载..."
 
     mkdir -p "${PROJECT_DIR}/models"
 
-    # 优先用 ModelScope（国内 AutoDL 节点更快）
-    if pip install -q modelscope 2>/dev/null; then
-        print_info "使用 ModelScope 下载..."
-        python3 "${PROJECT_DIR}/deploy/download_model.py" --source modelscope --target "${MODEL_DIR}"
-    else
-        print_info "ModelScope 不可用，使用 HuggingFace..."
-        pip install -q huggingface_hub
-        python3 "${PROJECT_DIR}/deploy/download_model.py" --source hf --target "${MODEL_DIR}"
-    fi
+    # 安装 huggingface_hub
+    pip install -q huggingface_hub
+
+    # 使用 hf-mirror 国内镜像下载（模型仅在 HuggingFace 上）
+    python3 "${PROJECT_DIR}/deploy/download_model.py" --source mirror --target "${MODEL_DIR}"
 
     if [ $? -eq 0 ]; then
         print_ok "模型下载完成"
     else
         print_error "模型下载失败，请检查网络连接"
         print_error "手动下载命令:"
-        print_error "  pip install modelscope"
-        print_error "  python3 deploy/download_model.py --source modelscope --target ${MODEL_DIR}"
+        print_error "  pip install -U huggingface_hub"
+        print_error "  export HF_ENDPOINT=https://hf-mirror.com"
+        print_error "  huggingface-cli download ecnu-icalk/educhat-r1-001-8b-qwen3.0 --local-dir ${MODEL_DIR}"
         exit 1
     fi
 fi

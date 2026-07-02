@@ -1,73 +1,64 @@
 #!/usr/bin/env python3
 """
 EduChat-R1 模型下载脚本
-支持从 HuggingFace 或 ModelScope 下载模型
+支持从 HuggingFace 或 hf-mirror（国内镜像）下载模型
 """
 
 import os
 import sys
 import argparse
 
-MODEL_REPO_HF = "ecnu-icalk/educhat-r1-001-8b-qwen3.0"
-MODEL_REPO_MS = "ECNU-ICALK/educhat-r1-001-8b-qwen3.0"
+MODEL_REPO = "ecnu-icalk/educhat-r1-001-8b-qwen3.0"
 
-def download_from_huggingface(target_dir: str):
+def download_from_huggingface(target_dir: str, use_mirror: bool = False):
     """从 HuggingFace 下载模型"""
-    print(f"[HuggingFace] 开始下载模型: {MODEL_REPO_HF}")
-    print(f"[HuggingFace] 目标目录: {target_dir}")
+    source_name = "hf-mirror (国内镜像)" if use_mirror else "HuggingFace"
+    print(f"[{source_name}] 开始下载模型: {MODEL_REPO}")
+    print(f"[{source_name}] 目标目录: {target_dir}")
+
+    # 如果使用镜像，设置环境变量
+    if use_mirror:
+        os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+        print(f"[{source_name}] 已设置 HF_ENDPOINT=https://hf-mirror.com")
 
     try:
         from huggingface_hub import snapshot_download
         snapshot_download(
-            repo_id=MODEL_REPO_HF,
+            repo_id=MODEL_REPO,
             local_dir=target_dir,
             resume_download=True,
         )
-        print(f"[HuggingFace] 模型下载完成: {target_dir}")
+        print(f"[{source_name}] 模型下载完成: {target_dir}")
+        return True
     except ImportError:
-        print("[HuggingFace] 未安装 huggingface_hub，正在安装...")
+        print(f"[{source_name}] 未安装 huggingface_hub，正在安装...")
         os.system("pip install -U huggingface_hub")
         from huggingface_hub import snapshot_download
         snapshot_download(
-            repo_id=MODEL_REPO_HF,
+            repo_id=MODEL_REPO,
             local_dir=target_dir,
             resume_download=True,
         )
-        print(f"[HuggingFace] 模型下载完成: {target_dir}")
+        print(f"[{source_name}] 模型下载完成: {target_dir}")
+        return True
+    except Exception as e:
+        print(f"[{source_name}] 下载失败: {e}")
+        return False
 
 def download_from_modelscope(target_dir: str):
-    """从 ModelScope（魔搭）下载模型（国内推荐）"""
-    print(f"[ModelScope] 开始下载模型: {MODEL_REPO_MS}")
-    print(f"[ModelScope] 目标目录: {target_dir}")
-
-    try:
-        from modelscope import snapshot_download
-        snapshot_download(
-            model_id=MODEL_REPO_MS,
-            local_dir=target_dir,
-        )
-        print(f"[ModelScope] 模型下载完成: {target_dir}")
-    except ImportError:
-        print("[ModelScope] 未安装 modelscope，正在安装...")
-        os.system("pip install modelscope")
-        from modelscope import snapshot_download
-        snapshot_download(
-            model_id=MODEL_REPO_MS,
-            local_dir=target_dir,
-        )
-        print(f"[ModelScope] 模型下载完成: {target_dir}")
+    """尝试从 ModelScope 下载（该模型可能不在 ModelScope 上）"""
+    print(f"[ModelScope] 模型 {MODEL_REPO} 可能不在 ModelScope 上，建议使用 HuggingFace 镜像")
+    return False
 
 def verify_model(model_dir: str):
     """验证模型文件完整性"""
     print(f"\n[验证] 检查模型目录: {model_dir}")
 
-    required_files = []
     optional_files = [
         "config.json",
         "tokenizer.json",
         "tokenizer_config.json",
         "generation_config.json",
-        "model.safetensors",
     ]
 
     all_files = os.listdir(model_dir) if os.path.exists(model_dir) else []
@@ -106,9 +97,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EduChat-R1 模型下载工具")
     parser.add_argument(
         "--source",
-        choices=["hf", "modelscope", "auto"],
+        choices=["hf", "mirror", "modelscope", "auto"],
         default="auto",
-        help="下载源: hf=HuggingFace, modelscope=魔搭(国内推荐), auto=自动选择",
+        help="下载源: hf=HuggingFace, mirror=hf-mirror国内镜像, modelscope=魔搭, auto=自动选择",
     )
     parser.add_argument(
         "--target",
@@ -129,22 +120,32 @@ if __name__ == "__main__":
     # 选择下载源
     source = args.source
     if source == "auto":
-        # 检测网络环境，优先使用 ModelScope（国内更快）
-        print("\n[自动检测] 尝试选择最优下载源...")
-        import socket
-        try:
-            socket.create_connection(("www.modelscope.cn", 443), timeout=3)
-            source = "modelscope"
-            print("[自动检测] 选择 ModelScope（国内网络优先）")
-        except (socket.timeout, ConnectionRefusedError, OSError):
-            source = "hf"
-            print("[自动检测] 选择 HuggingFace")
+        # 优先使用 hf-mirror 国内镜像
+        print("\n[自动检测] 优先使用 hf-mirror 国内镜像...")
+        source = "mirror"
 
     # 执行下载
+    success = False
     if source == "hf":
-        download_from_huggingface(args.target)
-    else:
-        download_from_modelscope(args.target)
+        success = download_from_huggingface(args.target, use_mirror=False)
+    elif source == "mirror":
+        success = download_from_huggingface(args.target, use_mirror=True)
+        if not success:
+            print("\n[重试] 镜像下载失败，尝试 HuggingFace 直连...")
+            success = download_from_huggingface(args.target, use_mirror=False)
+    elif source == "modelscope":
+        success = download_from_modelscope(args.target)
+        if not success:
+            print("\n[重试] ModelScope 不可用，切换到 hf-mirror 镜像...")
+            success = download_from_huggingface(args.target, use_mirror=True)
+
+    if not success:
+        print("\n[ERROR] 所有下载源均失败，请检查网络连接")
+        print("[ERROR] 手动下载命令:")
+        print(f"  pip install -U huggingface_hub")
+        print(f"  export HF_ENDPOINT=https://hf-mirror.com")
+        print(f"  huggingface-cli download {MODEL_REPO} --local-dir {args.target}")
+        sys.exit(1)
 
     # 验证
     verify_model(args.target)
