@@ -48,7 +48,15 @@ async def grade_stream_api(request: GradeRequest):
                 yield f"data: {chunk}\n\n"
         except Exception as e:
             yield f"data: [错误] {str(e)}\n\n"
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        }
+    )
 
 @api_router.post("/grade/file")
 async def grade_file(file: UploadFile = File(...), max_tokens: Optional[int] = 1024, subject: Optional[str] = None):

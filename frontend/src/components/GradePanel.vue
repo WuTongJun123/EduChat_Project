@@ -59,8 +59,12 @@
 
       <el-divider />
 
-      <div v-if="result">
+      <div v-if="result || loading">
         <h3>批改结果</h3>
+        <div v-if="loading && !result" class="loading-hint">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          模型正在批改中，请稍候...
+        </div>
         <div class="result-content" v-html="formattedResult"></div>
       </div>
     </el-card>
@@ -70,6 +74,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { gradeSync, gradeStreamFetch, gradeFile } from '../api'
 
 const form = ref({
@@ -132,15 +137,24 @@ const clear = () => {
   result.value = ''
 }
 
-// 将 Markdown 样式的文本转为 HTML（简单处理，可后续增强）
+// 将 Markdown 样式的文本转为 HTML
 const formattedResult = computed(() => {
   if (!result.value) return ''
-  return result.value
-    .replace(/\n/g, '<br>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  let html = result.value
+  // 先处理 ## 标题
+  html = html
     .replace(/^###\s*(.*)$/gm, '<div class="result-h3">$1</div>')
     .replace(/^##\s*(.*)$/gm, '<div class="result-h2">$1</div>')
     .replace(/^#\s*(.*)$/gm, '<div class="result-h1">$1</div>')
+  // 处理 【xxx】 格式的标题（模型可能用这种格式）
+  html = html.replace(/^【(.+?)】(.*)$/gm, '<div class="result-h2">$1</div>')
+  // 加粗
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+  // 换行
+  html = html.replace(/\n/g, '<br>')
+  // 清理多余空行
+  html = html.replace(/(<br>\s*){3,}/g, '<br><br>')
+  return html
 })
 </script>
 
@@ -161,38 +175,47 @@ const formattedResult = computed(() => {
   margin-left: 12px;
   color: #409eff;
 }
+.loading-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #409eff;
+  font-size: 15px;
+  padding: 20px 0;
+}
 .result-content {
   background-color: #f9fafc;
-  padding: 20px;
+  padding: 24px;
   border-radius: 8px;
-  line-height: 1.8;
-  font-size: 14px;
-  white-space: pre-wrap;
+  line-height: 2;
+  font-size: 15px;
+  color: #333;
   word-break: break-word;
 }
 .result-content :deep(strong) {
-  color: #303133;
+  color: #e6a23c;
+  font-weight: 600;
 }
 .result-content :deep(.result-h1) {
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
   color: #303133;
-  margin: 16px 0 8px 0;
+  margin: 18px 0 10px 0;
   padding-bottom: 6px;
   border-bottom: 2px solid #409eff;
 }
 .result-content :deep(.result-h2) {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   color: #303133;
-  margin: 14px 0 6px 0;
-  padding-left: 8px;
-  border-left: 3px solid #409eff;
+  margin: 16px 0 8px 0;
+  padding-left: 10px;
+  border-left: 4px solid #409eff;
 }
 .result-content :deep(.result-h3) {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: #606266;
-  margin: 10px 0 4px 0;
+  margin: 12px 0 6px 0;
 }
 </style>
