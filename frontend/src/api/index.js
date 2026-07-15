@@ -8,16 +8,16 @@ const api = axios.create({
 // ==================== 基础批改API ====================
 
 // 同步批改
-export const gradeSync = (content, maxTokens = 1024) => {
-  return api.post('/grade/sync', { content, max_tokens: maxTokens })
+export const gradeSync = (content, maxTokens = 1024, subject = null) => {
+  return api.post('/grade/sync', { content, max_tokens: maxTokens, subject })
 }
 
 // 流式批改（使用 fetch + ReadableStream）
-export const gradeStreamFetch = async (content, maxTokens, onChunk) => {
+export const gradeStreamFetch = async (content, maxTokens, onChunk, subject = null) => {
   const response = await fetch('/api/grade/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, max_tokens: maxTokens })
+    body: JSON.stringify({ content, max_tokens: maxTokens, subject })
   })
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -39,10 +39,11 @@ export const gradeStreamFetch = async (content, maxTokens, onChunk) => {
 }
 
 // 文件上传批改
-export const gradeFile = async (file, maxTokens = 1024) => {
+export const gradeFile = async (file, maxTokens = 1024, subject = null) => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('max_tokens', maxTokens)
+  if (subject) formData.append('subject', subject)
   
   return api.post('/grade/file', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

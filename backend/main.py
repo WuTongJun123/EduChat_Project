@@ -34,7 +34,7 @@ api_router = APIRouter(prefix="/api")
 async def grade_sync_api(request: GradeRequest):
     """同步批改接口"""
     try:
-        result = grade_sync(request.content, request.max_tokens)
+        result = grade_sync(request.content, request.max_tokens, request.subject)
         return GradeResponse(result=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -44,14 +44,14 @@ async def grade_stream_api(request: GradeRequest):
     """流式批改接口（Server-Sent Events）"""
     async def event_generator():
         try:
-            for chunk in grade_stream(request.content, request.max_tokens):
+            for chunk in grade_stream(request.content, request.max_tokens, request.subject):
                 yield f"data: {chunk}\n\n"
         except Exception as e:
             yield f"data: [错误] {str(e)}\n\n"
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @api_router.post("/grade/file")
-async def grade_file(file: UploadFile = File(...), max_tokens: Optional[int] = 1024):
+async def grade_file(file: UploadFile = File(...), max_tokens: Optional[int] = 1024, subject: Optional[str] = None):
     """文件上传批改接口"""
     # 保存临时文件
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as tmp:
@@ -63,7 +63,7 @@ async def grade_file(file: UploadFile = File(...), max_tokens: Optional[int] = 1
         text = extract_text_from_file(tmp_path)
         if text is None:
             raise HTTPException(status_code=400, detail="无法提取文件内容")
-        result = grade_sync(text, max_tokens)
+        result = grade_sync(text, max_tokens, subject)
         return {"result": result}
     finally:
         os.unlink(tmp_path)  # 删除临时文件

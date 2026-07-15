@@ -9,6 +9,16 @@
       </template>
 
       <el-form :model="form" label-width="80px">
+        <el-form-item label="学科">
+          <el-radio-group v-model="form.subject">
+            <el-radio-button label="数学">数学</el-radio-button>
+            <el-radio-button label="语文">语文</el-radio-button>
+            <el-radio-button label="编程">编程</el-radio-button>
+            <el-radio-button label="英语">英语</el-radio-button>
+            <el-radio-button label="">通用</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
         <el-form-item label="作业内容">
           <el-input
             v-model="form.content"
@@ -63,7 +73,8 @@ import { ElMessage } from 'element-plus'
 import { gradeSync, gradeStreamFetch, gradeFile } from '../api'
 
 const form = ref({
-  content: ''
+  content: '',
+  subject: '数学'
 })
 const maxTokens = ref(1024)
 const loading = ref(false)
@@ -97,13 +108,13 @@ const handleGrade = async () => {
   try {
     if (uploadedFile.value) {
       // 文件上传批改
-      const res = await gradeFile(uploadedFile.value, maxTokens.value)
+      const res = await gradeFile(uploadedFile.value, maxTokens.value, form.value.subject)
       result.value = res.data.result
     } else {
       // 使用流式批改（更佳体验）
       await gradeStreamFetch(form.value.content, maxTokens.value, (chunk) => {
         result.value += chunk
-      })
+      }, form.value.subject)
       // 如果不想用流式，可用同步接口：
       // const res = await gradeSync(form.value.content, maxTokens.value)
       // result.value = res.data.result

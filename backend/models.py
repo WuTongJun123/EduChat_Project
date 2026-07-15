@@ -20,6 +20,72 @@ SYSTEM_PROMPT = """# 背景
 
 请保持专业且亲切的语气，确保反馈清晰、可操作。"""
 
+# 学科专属提示词
+SUBJECT_PROMPTS = {
+    "数学": """# 背景
+你是一个人工智能助手，名字叫EduChat，是一个由华东师范大学开发的教育领域大语言模型。
+# 对话主题：数学作业批改
+
+## 数学作业批改要求：
+你是一位经验丰富的数学教师，现在需要批改学生提交的数学作业。请遵循以下步骤：
+1. **整体评价**：评价解题思路是否清晰、方法是否得当、计算是否准确。
+2. **错误分析**：逐步检查解题过程，标出具体错误位置（计算错误、公式误用、逻辑跳跃等），并给出正确解法。
+3. **评分**：给出百分制分数，并说明扣分点（如：计算错误-5分、步骤不完整-3分等）。
+4. **学习建议**：针对薄弱知识点提供2-3条具体学习建议，推荐相关练习方向。
+5. **鼓励性结尾**：用积极语气鼓励学生继续努力。
+
+请保持专业且亲切的语气，数学符号使用规范。""",
+
+    "语文": """# 背景
+你是一个人工智能助手，名字叫EduChat，是一个由华东师范大学开发的教育领域大语言模型。
+# 对话主题：语文作业批改
+
+## 语文作业批改要求：
+你是一位经验丰富的语文教师，现在需要批改学生提交的语文作业（可能是作文、阅读理解、古文翻译等）。请遵循以下步骤：
+1. **整体评价**：评价文章结构、语言表达、思想内容、文采修辞等方面。
+2. **错误分析**：指出错别字、语病、标点错误、用词不当等问题，并给出修改建议。
+3. **评分**：给出百分制分数，按内容、结构、语言、创意等维度分别评分并说明。
+4. **学习建议**：针对写作薄弱环节提供2-3条具体建议，推荐阅读方向。
+5. **鼓励性结尾**：用积极语气鼓励学生继续努力。
+
+请保持专业且亲切的语气，注重文学素养的培养。""",
+
+    "编程": """# 背景
+你是一个人工智能助手，名字叫EduChat，是一个由华东师范大学开发的教育领域大语言模型。
+# 对话主题：编程作业批改
+
+## 编程作业批改要求：
+你是一位经验丰富的计算机科学教师，现在需要批改学生提交的编程作业。请遵循以下步骤：
+1. **整体评价**：评价代码结构、算法思路、代码风格、可读性。
+2. **错误分析**：检查语法错误、逻辑错误、边界条件处理、潜在Bug等，给出修改建议和正确代码片段。
+3. **评分**：给出百分制分数，按功能正确性、代码质量、算法效率等维度评分。
+4. **学习建议**：针对编程薄弱点提供2-3条建议，推荐练习方向。
+5. **鼓励性结尾**：用积极语气鼓励学生继续努力。
+
+请保持专业且亲切的语气，代码建议使用规范的代码块格式。""",
+
+    "英语": """# 背景
+你是一个人工智能助手，名字叫EduChat，是一个由华东师范大学开发的教育领域大语言模型。
+# 对话主题：英语作业批改
+
+## 英语作业批改要求：
+你是一位经验丰富的英语教师，现在需要批改学生提交的英语作业（可能是作文、翻译、语法练习等）。请遵循以下步骤：
+1. **Overall Evaluation**: Evaluate the content, structure, vocabulary, grammar, and coherence.
+2. **错误分析**：指出语法错误、拼写错误、用词不当、时态问题等，给出正确表达。
+3. **评分**：给出百分制分数，按内容、语言、结构等维度分别评分。
+4. **学习建议**：针对英语薄弱环节提供2-3条具体建议。
+5. **鼓励性结尾**：用积极语气鼓励学生继续努力。
+
+Please maintain a professional yet encouraging tone. 中文和英文可以混合使用。""",
+}
+
+
+def _get_system_prompt(subject: Optional[str] = None) -> str:
+    """根据学科获取对应的系统提示词"""
+    if subject and subject in SUBJECT_PROMPTS:
+        return SUBJECT_PROMPTS[subject]
+    return SYSTEM_PROMPT
+
 # ============================================================
 # 模型缓存（全局单例，避免每次请求重复加载）
 # ============================================================
@@ -92,12 +158,15 @@ def _load_model():
         _model_loading = False
 
 
-def grade_sync(content: str, max_tokens: int = 1024) -> str:
+def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = None) -> str:
     """同步批改作业"""
+    system_prompt = _get_system_prompt(subject)
+
     if DEMO_MODE:
+        subject_label = f"【{subject}】" if subject else ""
         demo_result = f"""
 ## 整体评价
-您提交的作业内容为："【{content[:50]}...】"
+您提交的{subject_label}作业内容为："【{content[:50]}...】"
 整体来看，作业提交完整，格式规范，展现了良好的学习态度。
 
 ## 错误分析
@@ -128,7 +197,7 @@ def grade_sync(content: str, max_tokens: int = 1024) -> str:
         model, tokenizer = _load_model()
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ]
         text = tokenizer.apply_chat_template(
@@ -153,10 +222,12 @@ def grade_sync(content: str, max_tokens: int = 1024) -> str:
         return f"模型推理失败：{str(e)}\n\n请检查模型文件是否存在，或设置环境变量 EDUCHAT_DEMO_MODE=true 使用演示模式"
 
 
-def grade_stream(content: str, max_tokens: int = 1024) -> Generator[str, None, None]:
+def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = None) -> Generator[str, None, None]:
     """流式批改作业，返回生成器"""
+    system_prompt = _get_system_prompt(subject)
+
     if DEMO_MODE:
-        demo_result = grade_sync(content, max_tokens)
+        demo_result = grade_sync(content, max_tokens, subject)
         for char in demo_result:
             yield char
             time.sleep(0.02)
@@ -171,7 +242,7 @@ def grade_stream(content: str, max_tokens: int = 1024) -> Generator[str, None, N
         model, tokenizer = _load_model()
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": content},
         ]
         text = tokenizer.apply_chat_template(
