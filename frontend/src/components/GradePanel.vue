@@ -63,9 +63,10 @@
         <h3>批改结果</h3>
         <div v-if="loading && !result" class="loading-hint">
           <el-icon class="is-loading"><Loading /></el-icon>
-          模型正在批改中，请稍候...
+          模型正在加载中，首次请求需加载模型，请耐心等待...
         </div>
         <div class="result-content" v-html="formattedResult"></div>
+        <span v-if="loading && result" class="typing-cursor">|</span>
       </div>
     </el-card>
   </div>
@@ -137,24 +138,40 @@ const clear = () => {
   result.value = ''
 }
 
-// 将 Markdown 样式的文本转为 HTML
+// 将模型输出转为格式化 HTML
 const formattedResult = computed(() => {
   if (!result.value) return ''
-  let html = result.value
-  // 先处理 ## 标题
-  html = html
+  let text = result.value
+
+  // Step 1: 在 ## 前插入换行（处理模型不换行的情况）
+  text = text.replace(/(?!^)(?=##)/gm, '\n')
+
+  // Step 2: 在已知标题后插入换行（标题和内容挤在同一行的情况）
+  const headers = ['整体评价', '错误分析', '评分', '学习建议', '鼓励性结尾', 'Overall Evaluation']
+  headers.forEach(h => {
+    text = text.replace(new RegExp(`(##\\s*${h}\\s*)(?!\\n)`, 'g'), '$1\n')
+  })
+
+  // Step 3: 在 【xxx】 前插入换行
+  text = text.replace(/(?!^)(?=【)/g, '\n')
+
+  // Step 4: 转换标题为 div
+  text = text
     .replace(/^###\s*(.*)$/gm, '<div class="result-h3">$1</div>')
     .replace(/^##\s*(.*)$/gm, '<div class="result-h2">$1</div>')
     .replace(/^#\s*(.*)$/gm, '<div class="result-h1">$1</div>')
-  // 处理 【xxx】 格式的标题（模型可能用这种格式）
-  html = html.replace(/^【(.+?)】(.*)$/gm, '<div class="result-h2">$1</div>')
-  // 加粗
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-  // 换行
-  html = html.replace(/\n/g, '<br>')
-  // 清理多余空行
-  html = html.replace(/(<br>\s*){3,}/g, '<br><br>')
-  return html
+    .replace(/^【(.+?)】\s*(.*)$/gm, '<div class="result-h2">$1</div>')
+
+  // Step 5: 加粗
+  text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+
+  // Step 6: 换行
+  text = text.replace(/\n/g, '<br>')
+
+  // Step 7: 清理多余空行
+  text = text.replace(/(<br>\s*){3,}/g, '<br><br>')
+
+  return text
 })
 </script>
 
@@ -217,5 +234,16 @@ const formattedResult = computed(() => {
   font-weight: 600;
   color: #606266;
   margin: 12px 0 6px 0;
+}
+.typing-cursor {
+  display: inline-block;
+  color: #409eff;
+  font-weight: bold;
+  animation: blink 0.8s steps(2) infinite;
+  margin-left: 2px;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 </style>

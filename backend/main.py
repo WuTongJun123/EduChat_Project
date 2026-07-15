@@ -50,11 +50,12 @@ async def grade_stream_api(request: GradeRequest):
             yield f"data: [错误] {str(e)}\n\n"
     return StreamingResponse(
         event_generator(),
-        media_type="text/event-stream",
+        media_type="text/event-stream; charset=utf-8",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
+            "Transfer-Encoding": "chunked",
         }
     )
 
