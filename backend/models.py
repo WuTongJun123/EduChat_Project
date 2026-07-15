@@ -2,8 +2,8 @@ import os
 import time
 from typing import Optional, Generator
 
-# 检查是否启用演示模式（沙箱环境无GPU/模型文件时使用）
-DEMO_MODE = os.getenv("EDUCHAT_DEMO_MODE", "true").lower() == "true"
+# 先导入 config，确保 .env 文件被加载后再读取环境变量
+from config import DEMO_MODE, MODEL_PATH, USE_4BIT, MAX_NEW_TOKENS, TEMPERATURE, TOP_P
 
 # 系统提示词（作业批改专用）
 SYSTEM_PROMPT = """# 背景
@@ -111,7 +111,6 @@ def _load_model():
     try:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        from config import MODEL_PATH, USE_4BIT, MAX_NEW_TOKENS, TEMPERATURE, TOP_P
 
         print(f"正在加载 EduChat-R1 模型: {MODEL_PATH}")
         print(f"  - 4-bit 量化: {USE_4BIT}")
@@ -192,7 +191,6 @@ def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = No
 
     try:
         import torch
-        from config import MODEL_PATH, USE_4BIT, TEMPERATURE, TOP_P
 
         model, tokenizer = _load_model()
 
@@ -237,7 +235,6 @@ def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = 
         import torch
         from transformers import TextIteratorStreamer
         import threading
-        from config import MODEL_PATH, USE_4BIT, TEMPERATURE, TOP_P
 
         model, tokenizer = _load_model()
 
