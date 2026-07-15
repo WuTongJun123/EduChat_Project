@@ -138,10 +138,9 @@ const formattedResult = computed(() => {
   return result.value
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/^(#+)\s*(.*)$/gm, (match, hashes, content) => {
-      const level = hashes.length
-      return `<h${level}>${content}</h${level}>`
-    })
+    .replace(/^###\s*(.*)$/gm, '<div class="result-h3">$1</div>')
+    .replace(/^##\s*(.*)$/gm, '<div class="result-h2">$1</div>')
+    .replace(/^#\s*(.*)$/gm, '<div class="result-h1">$1</div>')
 })
 </script>
 
@@ -166,8 +165,34 @@ const formattedResult = computed(() => {
   background-color: #f9fafc;
   padding: 20px;
   border-radius: 8px;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-size: 14px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.result-content :deep(strong) {
+  color: #303133;
+}
+.result-content :deep(.result-h1) {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
+  margin: 16px 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #409eff;
+}
+.result-content :deep(.result-h2) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 14px 0 6px 0;
+  padding-left: 8px;
+  border-left: 3px solid #409eff;
+}
+.result-content :deep(.result-h3) {
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+  margin: 10px 0 4px 0;
 }
 </style>
