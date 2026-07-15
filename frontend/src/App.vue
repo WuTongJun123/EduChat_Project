@@ -9,11 +9,13 @@
             <el-radio-button value="rubric">评分标准</el-radio-button>
             <el-radio-button value="analytics">数据分析</el-radio-button>
             <el-radio-button value="research">科研评估</el-radio-button>
+            <el-radio-button value="causal">因果推理</el-radio-button>
           </el-radio-group>
         </div>
         <div class="header-info">
           <el-tag type="success">科研级优化版本</el-tag>
           <el-tag type="info">多模态 + 自适应评分</el-tag>
+        <el-tag type="warning">因果推理</el-tag>
         </div>
       </div>
     </div>
@@ -23,6 +25,7 @@
       <RubricManager v-if="currentModule === 'rubric'" />
       <AnalyticsDashboard v-if="currentModule === 'analytics'" />
       <ResearchConsole v-if="currentModule === 'research'" />
+      <CausalAnalysis v-if="currentModule === 'causal'" />
     </div>
   </div>
 </template>
@@ -33,6 +36,7 @@ import GradePanel from './components/GradePanel.vue'
 import RubricManager from './components/RubricManager.vue'
 import AnalyticsDashboard from './components/AnalyticsDashboard.vue'
 import ResearchConsole from './components/ResearchConsole.vue'
+import CausalAnalysis from './components/CausalAnalysis.vue'
 
 const currentModule = ref('grade')
 </script>

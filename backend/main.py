@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 import tempfile
 import os
+import time
 
 from schemas import GradeRequest, GradeResponse
 from models import grade_sync, grade_stream
@@ -351,6 +352,122 @@ async def compare_prompts_api(req: PromptCompareRequest):
 async def export_data_api(data_type: str = "all", format: str = "csv"):
     """导出实验数据"""
     return research_engine.export_experiment_data(data_type, format)
+
+# --- 因果推理模块 ---
+from causal_engine import causal_engine
+
+@api_router.get("/causal/graph")
+async def get_causal_graph_api(subject: str = "math"):
+    """获取因果知识图谱可视化数据"""
+    return causal_engine.get_graph(subject).get_graph_data()
+
+@api_router.get("/causal/nodes")
+async def get_causal_nodes_api(subject: str = "math"):
+    """获取所有知识点列表"""
+    graph = causal_engine.get_graph(subject)
+    nodes = []
+    for nid, node in graph.nodes.items():
+        nodes.append({
+            "id": nid,
+            "name": node.name,
+            "category": node.category,
+            "difficulty": node.difficulty,
+            "mastery": node.mastery,
+            "description": node.description,
+        })
+    return {"nodes": nodes, "subject": subject}
+
+import traceback as _tb
+
+@api_router.post("/causal/diagnose")
+async def diagnose_root_cause_api(req: dict):
+    """根因分析：从学生错误追溯根本原因"""
+    try:
+        return causal_engine.diagnose_root_cause(
+            student_id=req.get("student_id", "unknown"),
+            error_nodes=req.get("error_nodes", []),
+            subject=req.get("subject", "math"),
+            current_mastery=req.get("current_mastery"),
+        )
+    except Exception as e:
+        return {"error": str(e), "traceback": _tb.format_exc()}
+
+@api_router.post("/causal/counterfactual")
+async def counterfactual_analysis_api(req: dict):
+    """反事实推理：do(target = value)"""
+    try:
+        return causal_engine.counterfactual_analysis(
+            student_id=req.get("student_id", "unknown"),
+            target_node=req.get("target_node", ""),
+            intervention_mastery=req.get("intervention_mastery", 0.8),
+            subject=req.get("subject", "math"),
+            current_mastery=req.get("current_mastery"),
+        )
+    except Exception as e:
+        return {"error": str(e), "traceback": _tb.format_exc()}
+
+@api_router.get("/causal/effect")
+async def estimate_causal_effect_api(
+    cause_node: str,
+    effect_node: str,
+    subject: str = "math",
+):
+    """估计两个知识点间的因果效应"""
+    try:
+        return causal_engine.estimate_causal_effect(cause_node, effect_node, subject)
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.post("/causal/discovery")
+async def causal_discovery_api(req: dict):
+    """因果发现：从数据中学习因果结构"""
+    try:
+        return causal_engine.causal_discovery(
+            score_data=req.get("score_data", []),
+            subject=req.get("subject", "math"),
+        )
+    except Exception as e:
+        return {"error": str(e), "traceback": _tb.format_exc()}
+
+@api_router.post("/causal/learning-path")
+async def recommend_learning_path_api(req: dict):
+    """基于因果图推荐最优学习路径"""
+    try:
+        return causal_engine.recommend_learning_path(
+            student_id=req.get("student_id", "unknown"),
+            target_nodes=req.get("target_nodes", []),
+            subject=req.get("subject", "math"),
+            current_mastery=req.get("current_mastery"),
+        )
+    except Exception as e:
+        return {"error": str(e), "traceback": _tb.format_exc()}
+
+@api_router.get("/causal/report")
+async def generate_research_report_api(subject: str = "math"):
+    """生成因果推理科研报告"""
+    try:
+        return causal_engine.generate_research_report(subject)
+    except Exception as e:
+        return {"error": str(e)}
+
+@api_router.get("/causal/overview")
+async def causal_overview_api():
+    """因果推理总览数据"""
+    try:
+        reports = {}
+        for subject in ["math", "chinese", "programming"]:
+            try:
+                reports[subject] = causal_engine.generate_research_report(subject)
+            except Exception:
+                reports[subject] = {"error": "graph not available"}
+        return {
+            "subjects": list(reports.keys()),
+            "reports": reports,
+            "total_diagnoses": len(causal_engine.diagnosis_history),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 app.include_router(api_router)
 app.mount("/", StaticFiles(directory="../frontend/dist", html=True), name="static")

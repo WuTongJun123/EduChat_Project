@@ -123,6 +123,29 @@ export const gradeWithRubric = (rubricId, content, studentId) => {
   return api.post(`/rubric/${rubricId}/grade`, { content, student_id: studentId })
 }
 
+// ========== 因果推理 API ==========
+export const causalApi = {
+  // 获取因果图谱
+  getGraph: (subject = 'math') => api.get(`/research/causal/graph?subject=${subject}`),
+  // 获取知识点列表
+  getNodes: (subject = 'math') => api.get(`/research/causal/nodes?subject=${subject}`),
+  // 根因诊断
+  diagnose: (data) => api.post('/research/causal/diagnose', data),
+  // 反事实推理
+  counterfactual: (data) => api.post('/research/causal/counterfactual', data),
+  // 因果效应估计
+  estimateEffect: (causeNode, effectNode, subject = 'math') =>
+    api.get(`/research/causal/effect?cause_node=${causeNode}&effect_node=${effectNode}&subject=${subject}`),
+  // 因果发现
+  discovery: (data) => api.post('/research/causal/discovery', data),
+  // 学习路径推荐
+  learningPath: (data) => api.post('/research/causal/learning-path', data),
+  // 科研报告
+  report: (subject = 'math') => api.get(`/research/causal/report?subject=${subject}`),
+  // 总览
+  overview: () => api.get('/research/causal/overview'),
+}
+
 export default api
 
 // ==================== 科研评估 API ====================
