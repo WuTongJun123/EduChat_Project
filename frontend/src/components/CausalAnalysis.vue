@@ -598,6 +598,13 @@ async function runEffect() {
     effectResult.value = {
       ...data,
       total_effect: data.total_causal_effect || 0,
+      direct_effect: (() => {
+        // 查找原因→结果之间是否有直接边
+        const directLink = (graphData.value?.links || []).find(
+          l => l.source === effectForm.cause && l.target === effectForm.effect
+        )
+        return directLink ? (directLink.value || directLink.causal_strength || directLink.weight || 0) : 0
+      })(),
       significant: (data.total_causal_effect || 0) >= 0.3,
       path_details: (data.paths || []).map(p => ({
         path: (p.path || []).join(' → '),
@@ -605,6 +612,8 @@ async function runEffect() {
         type: p.length <= 2 ? '直接因果' : '间接因果',
       })),
     }
+    // 间接效应 = 总效应 - 直接效应
+    effectResult.value.indirect_effect = Math.max(0, (effectResult.value.total_effect || 0) - (effectResult.value.direct_effect || 0))
   } catch (e) {
     ElMessage.error('估计失败: ' + (e.response?.data?.detail || e.message))
   } finally {
