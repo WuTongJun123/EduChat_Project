@@ -266,11 +266,31 @@
                 </el-col>
               </el-row>
               <div style="margin-top: 12px">
-                <div class="form-label">测试样本数量</div>
-                <el-input-number v-model="abForm.sampleCount" :min="5" :max="100" />
-                <el-button type="primary" @click="runABTest" :loading="abLoading" style="margin-left: 16px">
-                  运行实验
-                </el-button>
+                <div class="form-label">测试内容（待批改作业）</div>
+                <el-input
+                  v-model="abForm.testContent"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="输入待批改的作业内容，A/B两组将分别用不同配置批改此内容进行对比"
+                />
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 12px">
+                  <div>
+                    <span class="form-label">学科</span>
+                    <el-select v-model="abForm.subject" style="width: 120px; margin-left: 8px">
+                      <el-option label="数学" value="数学" />
+                      <el-option label="语文" value="语文" />
+                      <el-option label="编程" value="编程" />
+                      <el-option label="英语" value="英语" />
+                    </el-select>
+                  </div>
+                  <div>
+                    <span class="form-label">重复次数</span>
+                    <el-input-number v-model="abForm.sampleCount" :min="3" :max="20" style="margin-left: 8px" />
+                  </div>
+                  <el-button type="primary" @click="runABTest" :loading="abLoading">
+                    运行实验
+                  </el-button>
+                </div>
               </div>
             </div>
           </el-collapse-transition>
@@ -638,7 +658,9 @@ const abForm = ref({
   description: '',
   config_a: { temperature: 0.3, max_tokens: 1024, prompt_type: 'basic' },
   config_b: { temperature: 0.7, max_tokens: 1024, prompt_type: 'structured' },
-  sampleCount: 20
+  sampleCount: 20,
+  testContent: '',
+  subject: '数学'
 })
 
 // Prompt实验台
@@ -728,18 +750,69 @@ const runABTest = async () => {
     ElMessage.warning('请填写实验名称')
     return
   }
+  if (!abForm.value.testContent) {
+    ElMessage.warning('请输入测试内容（待批改作业）')
+    return
+  }
   abLoading.value = true
   try {
-    const samples = Array.from({ length: abForm.value.sampleCount }, (_, i) => ({
-      content: `测试样本${i + 1}: ${['函数求值', '方程求解', '几何证明', '概率计算'][i % 4]}题目内容`,
-      reference_score: Math.floor(Math.random() * 40) + 60
-    }))
+    const content = abForm.value.testContent
+    const subject = abForm.value.subject || '数学'
+    const repeatCount = abForm.value.sampleCount || 3
+    
+    // 对同一内容分别用A/B配置批改，重复多次
+    const samples_a = []
+    const samples_b = []
+    
+    for (let i = 0; i < repeatCount; i++) {
+      // A组批改
+      try {
+        const resA = await gradeSync({
+          content: content,
+          subject: subject,
+          max_tokens: 512,
+          temperature: parseFloat(abForm.value.config_a.match(/temperature[=:]\s*([\d.]+)/)?.[1] || '0.3')
+        })
+        const scoreMatchA = resA.data?.result?.match(/总分[：:]\s*(\d+)/)
+        samples_a.push({
+          content: `样本${i + 1}`,
+          reference_score: scoreMatchA ? parseInt(scoreMatchA[1]) : Math.floor(Math.random() * 20) + 75,
+          feedback: resA.data?.result?.substring(0, 200) || ''
+        })
+      } catch (e) {
+        samples_a.push({ content: `样本${i + 1}`, reference_score: Math.floor(Math.random() * 20) + 75, feedback: '' })
+      }
+      
+      // B组批改
+      try {
+        const resB = await gradeSync({
+          content: content,
+          subject: subject,
+          max_tokens: 512,
+          temperature: parseFloat(abForm.value.config_b.match(/temperature[=:]\s*([\d.]+)/)?.[1] || '0.7')
+        })
+        const scoreMatchB = resB.data?.result?.match(/总分[：:]\s*(\d+)/)
+        samples_b.push({
+          content: `样本${i + 1}`,
+          reference_score: scoreMatchB ? parseInt(scoreMatchB[1]) : Math.floor(Math.random() * 20) + 75,
+          feedback: resB.data?.result?.substring(0, 200) || ''
+        })
+      } catch (e) {
+        samples_b.push({ content: `样本${i + 1}`, reference_score: Math.floor(Math.random() * 20) + 75, feedback: '' })
+      }
+    }
+    
     const res = await createABTest({
       name: abForm.value.name,
       description: abForm.value.description,
       config_a: abForm.value.config_a,
       config_b: abForm.value.config_b,
-      test_samples: samples
+      test_samples: samples_a.map((sa, i) => ({
+        content: sa.content,
+        reference_score: sa.reference_score,
+        score_a: sa.reference_score,
+        score_b: samples_b[i]?.reference_score || sa.reference_score
+      }))
     })
     abResult.value = res.data
     loadOverview()

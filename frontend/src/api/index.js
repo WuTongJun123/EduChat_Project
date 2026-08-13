@@ -8,8 +8,11 @@ const api = axios.create({
 // ==================== 基础批改API ====================
 
 // 同步批改
-export const gradeSync = (content, maxTokens = 1024, subject = null) => {
-  return api.post('/grade/sync', { content, max_tokens: maxTokens, subject })
+export const gradeSync = (content, maxTokens = 1024, subject = null, temperature = null, promptType = null) => {
+  const data = { content, max_tokens: maxTokens, subject }
+  if (temperature !== null) data.temperature = temperature
+  if (promptType) data.prompt_type = promptType
+  return api.post('/grade/sync', data)
 }
 
 // 流式批改（使用 fetch + ReadableStream）

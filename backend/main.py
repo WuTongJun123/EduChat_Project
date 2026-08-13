@@ -34,7 +34,8 @@ api_router = APIRouter(prefix="/api")
 async def grade_sync_api(request: GradeRequest):
     """同步批改接口"""
     try:
-        result = grade_sync(request.content, request.max_tokens, request.subject)
+        result = grade_sync(request.content, request.max_tokens, request.subject, 
+                          temperature=request.temperature, prompt_type=request.prompt_type)
         return GradeResponse(result=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -44,7 +45,8 @@ async def grade_stream_api(request: GradeRequest):
     """流式批改接口（Server-Sent Events）"""
     async def event_generator():
         try:
-            for chunk in grade_stream(request.content, request.max_tokens, request.subject):
+            for chunk in grade_stream(request.content, request.max_tokens, request.subject,
+                                    temperature=request.temperature, prompt_type=request.prompt_type):
                 yield f"data: {chunk}\n\n"
         except Exception as e:
             yield f"data: [错误] {str(e)}\n\n"

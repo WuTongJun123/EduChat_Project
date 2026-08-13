@@ -154,12 +154,85 @@ Please maintain a professional yet encouraging tone. 中文和英文可以混合
 重要：每个章节标题必须单独占一行，标题和内容之间必须换行。""",
 }
 
+# Prompt 变体（用于 A/B 测试）
+PROMPT_VARIANTS = {
+    "basic": "",  # 使用默认（即 SUBJECT_PROMPTS 或 SYSTEM_PROMPT）
+    "structured": """
 
-def _get_system_prompt(subject: Optional[str] = None) -> str:
-    """根据学科获取对应的系统提示词"""
+【结构化批改模式】
+请严格按照以下结构输出批改结果，每个部分必须完整：
+
+1️⃣ 整体评价
+- 内容完整性：[高/中/低]
+- 格式规范性：[高/中/低]
+- 一句话总结：...
+
+2️⃣ 逐题分析
+对每一题单独分析：
+- 题目：...
+- 正确性：[正确/部分正确/错误]
+- 扣分点：...（如有）
+- 解题建议：...
+
+3️⃣ 评分明细
+| 评分维度 | 得分 | 满分 | 说明 |
+|----------|------|------|------|
+| ... | ... | ... | ... |
+
+4️⃣ 总分：XX/100
+
+5️⃣ 学习建议
+（3条以上具体建议）
+
+6️⃣ 鼓励
+（积极正面的一句话）
+
+重要：每个章节标题必须单独占一行，标题和内容之间必须换行。""",
+
+    "cot": """
+
+【思维链批改模式（Chain-of-Thought）】
+请按以下思维链逐步推理后再给出批改结果：
+
+Step 1 - 理解题目：先复述题目要求，确认理解正确
+Step 2 - 分析解答：逐步检查学生的每一步解答
+Step 3 - 识别错误：标注具体哪一步出现了什么问题
+Step 4 - 计算扣分：根据错误严重程度计算每个扣分点
+Step 5 - 综合评分：汇总得出总分
+Step 6 - 生成建议：针对每个错误给出具体改进方法
+
+然后按以下格式输出：
+## 整体评价
+（基于思维链分析的综合评价）
+
+## 错误分析
+（列出所有发现的错误及其原因）
+
+## 评分
+**总分：XX分**
+（每个扣分点的详细说明）
+
+## 学习建议
+（针对错误的具体改进建议）
+
+## 鼓励性结尾
+（积极鼓励）
+
+重要：每个章节标题必须单独占一行，标题和内容之间必须换行。"""
+}
+
+
+def _get_system_prompt(subject: Optional[str] = None, prompt_type: Optional[str] = None) -> str:
+    """根据学科和prompt类型获取对应的系统提示词"""
+    base_prompt = SYSTEM_PROMPT
     if subject and subject in SUBJECT_PROMPTS:
-        return SUBJECT_PROMPTS[subject]
-    return SYSTEM_PROMPT
+        base_prompt = SUBJECT_PROMPTS[subject]
+
+    # 如果指定了 prompt_type 变体，追加到基础提示词
+    if prompt_type and prompt_type in PROMPT_VARIANTS and PROMPT_VARIANTS[prompt_type]:
+        return base_prompt + PROMPT_VARIANTS[prompt_type]
+
+    return base_prompt
 
 # ============================================================
 # 模型缓存（全局单例，避免每次请求重复加载）
@@ -232,9 +305,9 @@ def _load_model():
         _model_loading = False
 
 
-def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = None) -> str:
+def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None) -> str:
     """同步批改作业"""
-    system_prompt = _get_system_prompt(subject)
+    system_prompt = _get_system_prompt(subject, prompt_type)
 
     if DEMO_MODE:
         subject_label = f"【{subject}】" if subject else ""
@@ -278,11 +351,12 @@ def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = No
         )
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
 
+        actual_temp = temperature if temperature is not None else TEMPERATURE
         with torch.no_grad():
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=max_tokens,
-                temperature=TEMPERATURE,
+                temperature=actual_temp,
                 do_sample=True,
                 top_p=TOP_P,
             )
@@ -295,9 +369,9 @@ def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = No
         return f"模型推理失败：{str(e)}\n\n请检查模型文件是否存在，或设置环境变量 EDUCHAT_DEMO_MODE=true 使用演示模式"
 
 
-def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = None) -> Generator[str, None, None]:
+def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None) -> Generator[str, None, None]:
     """流式批改作业，返回生成器"""
-    system_prompt = _get_system_prompt(subject)
+    system_prompt = _get_system_prompt(subject, prompt_type)
 
     if DEMO_MODE:
         demo_result = grade_sync(content, max_tokens, subject)
