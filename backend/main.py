@@ -365,12 +365,12 @@ async def export_data_api(data_type: str = "all", format: str = "csv"):
 # --- 因果推理模块 ---
 from causal_engine import causal_engine
 
-@api_router.get("/causal/graph")
+@api_router.get("/research/causal/graph")
 async def get_causal_graph_api(subject: str = "math"):
     """获取因果知识图谱可视化数据"""
     return causal_engine.get_graph(subject).get_graph_data()
 
-@api_router.get("/causal/nodes")
+@api_router.get("/research/causal/nodes")
 async def get_causal_nodes_api(subject: str = "math"):
     """获取所有知识点列表"""
     graph = causal_engine.get_graph(subject)
@@ -388,7 +388,7 @@ async def get_causal_nodes_api(subject: str = "math"):
 
 import traceback as _tb
 
-@api_router.post("/causal/diagnose")
+@api_router.post("/research/causal/diagnose")
 async def diagnose_root_cause_api(req: dict):
     """根因分析：从学生错误追溯根本原因"""
     try:
@@ -401,7 +401,7 @@ async def diagnose_root_cause_api(req: dict):
     except Exception as e:
         return {"error": str(e), "traceback": _tb.format_exc()}
 
-@api_router.post("/causal/counterfactual")
+@api_router.post("/research/causal/counterfactual")
 async def counterfactual_analysis_api(req: dict):
     """反事实推理：do(target = value)"""
     try:
@@ -415,7 +415,7 @@ async def counterfactual_analysis_api(req: dict):
     except Exception as e:
         return {"error": str(e), "traceback": _tb.format_exc()}
 
-@api_router.get("/causal/effect")
+@api_router.get("/research/causal/effect")
 async def estimate_causal_effect_api(
     cause_node: str,
     effect_node: str,
@@ -427,7 +427,7 @@ async def estimate_causal_effect_api(
     except Exception as e:
         return {"error": str(e)}
 
-@api_router.post("/causal/discovery")
+@api_router.post("/research/causal/discovery")
 async def causal_discovery_api(req: dict):
     """因果发现：从数据中学习因果结构"""
     try:
@@ -438,7 +438,7 @@ async def causal_discovery_api(req: dict):
     except Exception as e:
         return {"error": str(e), "traceback": _tb.format_exc()}
 
-@api_router.post("/causal/learning-path")
+@api_router.post("/research/causal/learning-path")
 async def recommend_learning_path_api(req: dict):
     """基于因果图推荐最优学习路径"""
     try:
@@ -451,7 +451,7 @@ async def recommend_learning_path_api(req: dict):
     except Exception as e:
         return {"error": str(e), "traceback": _tb.format_exc()}
 
-@api_router.get("/causal/report")
+@api_router.get("/research/causal/report")
 async def generate_research_report_api(subject: str = "math"):
     """生成因果推理科研报告"""
     try:
@@ -459,7 +459,7 @@ async def generate_research_report_api(subject: str = "math"):
     except Exception as e:
         return {"error": str(e)}
 
-@api_router.get("/causal/overview")
+@api_router.get("/research/causal/overview")
 async def causal_overview_api():
     """因果推理总览数据"""
     try:
