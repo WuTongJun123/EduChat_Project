@@ -49,11 +49,15 @@
         <el-progress :percentage="Math.round(batchProgress.done / batchProgress.total * 100)" :format="() => `${batchProgress.done} / ${batchProgress.total}`" />
       </div>
 
-      <!-- Max Tokens 滑块 -->
+      <!-- 反馈详细程度 -->
       <div style="display: flex; align-items: center; margin-bottom: 20px;">
-        <span style="font-weight: 600; margin-right: 12px;">最大输出长度：</span>
-        <el-slider v-model="maxTokens" :min="128" :max="2048" :step="128" style="flex: 1;" />
-        <span class="slider-value">{{ maxTokens }}</span>
+        <span style="font-weight: 600; margin-right: 12px;">反馈详细程度：</span>
+        <el-radio-group v-model="detailLevel" size="small">
+          <el-radio-button label="brief">简洁</el-radio-button>
+          <el-radio-button label="normal">标准</el-radio-button>
+          <el-radio-button label="detailed">详细</el-radio-button>
+        </el-radio-group>
+        <span style="color: #909399; font-size: 12px; margin-left: 12px;">{{ detailHint }}</span>
       </div>
 
       <!-- 操作按钮 -->
@@ -113,7 +117,12 @@ const form = ref({
   content: '',
   subject: '数学'
 })
-const maxTokens = ref(1024)
+const detailLevel = ref('normal')
+const detailHint = computed(() => {
+  const hints = { brief: '只给分数和简短评语', normal: '评分 + 错误分析 + 学习建议', detailed: '详细分析每一步 + 多角度建议' }
+  return hints[detailLevel.value] || ''
+})
+const maxTokensByLevel = { brief: 256, normal: 512, detailed: 1024 }
 const loading = ref(false)
 const result = ref('')
 const uploadedFile = ref(null)
@@ -158,10 +167,10 @@ const handleGrade = async () => {
 
   try {
     if (uploadedFile.value) {
-      const res = await gradeFile(uploadedFile.value, maxTokens.value, form.value.subject)
+      const res = await gradeFile(uploadedFile.value, maxTokensByLevel[detailLevel.value], form.value.subject)
       result.value = res.data.result
     } else {
-      await gradeStreamFetch(form.value.content, maxTokens.value, (chunk) => {
+      await gradeStreamFetch(form.value.content, maxTokensByLevel[detailLevel.value], (chunk) => {
         result.value += chunk
       }, form.value.subject)
     }
@@ -255,7 +264,7 @@ const runBatchGrade = async (file, fileName) => {
 
       for (const row of rows) {
         try {
-          const res = await gradeSync(row.content, 512, form.value.subject || row.subject)
+          const res = await gradeSync(row.content, maxTokensByLevel[detailLevel.value], form.value.subject || row.subject)
           const resultText = res.data.result || ''
           const scoreMatch = resultText.match(/总分[：:]\s*(\d+)/)
           batchResults.value.push({
