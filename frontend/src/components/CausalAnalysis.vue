@@ -163,33 +163,33 @@
           </el-col>
           <el-col :span="14">
             <el-card shadow="never" v-if="cfResult">
-              <template #header><span>反事实结果</span></template>
+              <template #header><span>反事实推理结果</span></template>
               <div class="cf-comparison">
                 <div class="cf-col cf-before">
-                  <h4>事实（当前）</h4>
-                  <div class="cf-score">{{ cfResult.current_score.toFixed(1) }}</div>
-                  <p>当前总成绩</p>
+                  <h4>当前掌握度</h4>
+                  <div class="cf-score">{{ (cfResult.original_mastery * 100).toFixed(0) }}%</div>
+                  <p>{{ cfResult.target_node_name }}</p>
                 </div>
                 <el-icon class="cf-arrow"><Right /></el-icon>
                 <div class="cf-col cf-after">
-                  <h4>反事实（干预后）</h4>
-                  <div class="cf-score">{{ cfResult.counterfactual_score.toFixed(1) }}</div>
-                  <p>预测总成绩</p>
+                  <h4>干预后掌握度</h4>
+                  <div class="cf-score">{{ (cfResult.intervention_value * 100).toFixed(0) }}%</div>
+                  <p>do({{ cfResult.target_node_name }} = {{ (cfResult.intervention_value * 100).toFixed(0) }}%)</p>
                 </div>
                 <div class="cf-col cf-delta">
-                  <h4>变化量</h4>
-                  <div class="cf-score" :class="cfResult.score_change >= 0 ? 'positive' : 'negative'">
-                    {{ cfResult.score_change >= 0 ? '+' : '' }}{{ cfResult.score_change.toFixed(1) }}
+                  <h4>下游总预期提升</h4>
+                  <div class="cf-score positive">
+                    +{{ (cfResult.total_expected_improvement * 100).toFixed(1) }}%
                   </div>
-                  <p>预计变化</p>
+                  <p>平均掌握度提升</p>
                 </div>
               </div>
               <el-divider />
-              <h4>影响的知识点</h4>
+              <h4>下游知识点预测变化</h4>
               <div ref="cfChartRef" class="cf-chart"></div>
               <el-divider />
-              <el-alert :type="cfResult.score_change >= 0 ? 'success' : 'warning'" :closable="false" show-icon
-                :title="`干预结论：将「${cfResult.intervention_node_name}」掌握度提升至 ${(cfResult.intervention_mastery * 100).toFixed(0)}%，预计总成绩${cfResult.score_change >= 0 ? '提升' : '下降'} ${Math.abs(cfResult.score_change).toFixed(1)} 分`" />
+              <el-alert type="success" :closable="false" show-icon
+                :title="`干预结论：将「${cfResult.target_node_name}」掌握度从 ${(cfResult.original_mastery * 100).toFixed(0)}% 提升至 ${(cfResult.intervention_value * 100).toFixed(0)}%，下游 ${cfResult.affected_count} 个知识点预计平均掌握度提升 ${(cfResult.total_expected_improvement * 100).toFixed(1)}%`" />
             </el-card>
             <el-empty v-else description="执行反事实推理后查看结果" :image-size="100" />
           </el-col>
@@ -540,20 +540,8 @@ async function runCounterfactual() {
       subject: currentSubject.value,
     })
     const data = res.data
-    // 映射后端字段到前端期望格式
-    const currentScore = data.total_expected_improvement != null
-      ? 60 + (1 - (data.total_expected_improvement || 0)) * 20
-      : 60
-    const cfScore = data.total_expected_improvement != null
-      ? currentScore + data.total_expected_improvement * 100
-      : 60
     cfResult.value = {
       ...data,
-      current_score: currentScore,
-      counterfactual_score: cfScore,
-      score_change: cfScore - currentScore,
-      intervention_node_name: data.target_node_name || cfForm.target_node,
-      intervention_mastery: data.intervention_value || cfForm.intervention_mastery / 100,
       impacted_nodes: (data.detailed_results || []).map(r => ({
         node_name: r.node_name,
         node_id: r.node_id,
