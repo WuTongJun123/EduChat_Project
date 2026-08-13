@@ -26,7 +26,7 @@
               <template #header>
                 <div class="card-header">
                   <span>知识点因果网络</span>
-                  <el-tag size="small" type="info">{{ graphData.nodes?.length || 0 }} 节点 / {{ graphData.edges?.length || 0 }} 因果边</el-tag>
+                  <el-tag size="small" type="info">{{ graphData.nodes?.length || 0 }} 节点 / {{ (graphData.links?.length || graphData.edges?.length || 0) }} 因果边</el-tag>
                 </div>
               </template>
               <div ref="graphChartRef" class="graph-chart"></div>
