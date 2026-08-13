@@ -409,11 +409,13 @@ class CausalInferenceEngine:
         """
         graph = self.get_graph(subject)
 
-        # 初始化学生状态
+        # 初始化学生状态（生成差异化掌握度）
+        student_mastery = self.get_student_mastery(student_id, graph)
         if current_mastery:
-            for nid, m in current_mastery.items():
-                if nid in graph.nodes:
-                    graph.nodes[nid].mastery = m
+            student_mastery.update(current_mastery)
+        for nid, m in student_mastery.items():
+            if nid in graph.nodes:
+                graph.nodes[nid].mastery = m
 
         # Step 1: 记录表面错误
         surface_errors = []
@@ -605,11 +607,13 @@ class CausalInferenceEngine:
         """
         graph = self.get_graph(subject)
 
-        # 初始化当前状态
+        # 初始化学生差异化掌握度
+        student_mastery = self.get_student_mastery(student_id, graph)
         if current_mastery:
-            for nid, m in current_mastery.items():
-                if nid in graph.nodes:
-                    graph.nodes[nid].mastery = m
+            student_mastery.update(current_mastery)
+        for nid, m in student_mastery.items():
+            if nid in graph.nodes:
+                graph.nodes[nid].mastery = m
 
         if target_node not in graph.nodes:
             return {"error": f"知识点 {target_node} 不存在"}
@@ -711,7 +715,7 @@ class CausalInferenceEngine:
     ) -> Dict:
         """
         估计两个知识点间的因果效应
-        使用路径分析法：找到所有因果路径，加权求和
+        区分直接效应和间接效应：直接效应=有直接连边的强度，间接效应=通过中介节点的效应
         """
         graph = self.get_graph(subject)
 
@@ -727,19 +731,34 @@ class CausalInferenceEngine:
                 "cause_name": graph.nodes[cause_node].name,
                 "effect_node": effect_node,
                 "effect_name": graph.nodes[effect_node].name,
+                "direct_causal_effect": 0,
+                "indirect_causal_effect": 0,
                 "total_causal_effect": 0,
                 "paths": [],
                 "interpretation": f"未找到从「{graph.nodes[cause_node].name}」到「{graph.nodes[effect_node].name}」的因果路径",
             }
 
-        # 总因果效应 = 所有路径效应的加权和（考虑路径重叠去重）
-        total_effect = 0
+        # 直接效应：如果有直接连边，取边的因果强度
+        direct_edge_key = f"{cause_node}->{effect_node}"
+        direct_effect = 0
+        if direct_edge_key in graph.edges:
+            direct_effect = graph.edges[direct_edge_key].causal_strength
+
+        # 间接效应：非直接路径的效应之和
+        indirect_effect = 0
         path_details = []
+        direct_path_found = False
 
         for i, path_info in enumerate(paths):
             # 路径效应 = 平均因果强度 × 路径衰减
             path_effect = path_info["avg_causal_strength"] * math.exp(-0.1 * path_info["path_length"])
-            total_effect += path_effect * (0.8 ** i)  # 后续路径权重递减
+
+            is_direct = path_info["path_length"] == 1
+            if is_direct:
+                direct_path_found = True
+            else:
+                # 间接路径效应累加（权重递减）
+                indirect_effect += path_effect * (0.8 ** (i - (1 if direct_path_found else 0)))
 
             path_details.append({
                 "path_index": i + 1,
@@ -747,9 +766,21 @@ class CausalInferenceEngine:
                 "avg_strength": path_info["avg_causal_strength"],
                 "length": path_info["path_length"],
                 "path_effect": round(path_effect, 4),
+                "is_direct": is_direct,
             })
 
-        total_effect = min(total_effect, 1.0)
+        # 总效应：直接效应 + 间接路径效应（带衰减）
+        total_raw = direct_effect
+        for i, path_info in enumerate(paths):
+            if path_info.get("path_length", 999) == 1 or path_info.get("is_direct", False):
+                continue  # 跳过直接路径
+            path_effect = path_info["avg_causal_strength"] * math.exp(-0.1 * path_info["path_length"])
+            total_raw += path_effect * (0.8 ** i)
+
+        # 确保总效应在合理范围
+        total_effect = min(total_raw, 1.0)
+        # 间接效应 = 总效应 - 直接效应，确保非负
+        indirect_effect = max(total_effect - direct_effect, 0)
 
         # 效应强度标签
         if total_effect >= 0.7:
@@ -766,14 +797,16 @@ class CausalInferenceEngine:
             "cause_name": graph.nodes[cause_node].name,
             "effect_node": effect_node,
             "effect_name": graph.nodes[effect_node].name,
+            "direct_causal_effect": round(direct_effect, 4),
+            "indirect_causal_effect": round(indirect_effect, 4),
             "total_causal_effect": round(total_effect, 4),
             "strength_label": strength_label,
             "path_count": len(paths),
             "paths": path_details,
             "interpretation": (
                 f"「{graph.nodes[cause_node].name}」对「{graph.nodes[effect_node].name}」"
-                f"的总因果效应为 {total_effect:.2f}（{strength_label}），"
-                f"共找到 {len(paths)} 条因果路径。"
+                f"的总因果效应为 {total_effect:.2f}（直接效应 {direct_effect:.2f} + 间接效应 {indirect_effect:.2f}），"
+                f"共找到 {len(paths)} 条因果路径，属于{strength_label}。"
             ),
         }
 
@@ -905,6 +938,39 @@ class CausalInferenceEngine:
 
         return data
 
+    def get_student_mastery(self, student_id: str, graph: CausalKnowledgeGraph) -> Dict[str, float]:
+        """
+        获取学生各知识点的掌握度
+        根据学生ID生成确定性的差异化掌握度（同学生多次查询结果一致）
+        """
+        # 用学生ID的哈希值作为随机种子，确保同一学生数据一致
+        seed = hash(student_id) % (2**31)
+        rng = random.Random(seed)
+
+        mastery = {}
+        node_ids = list(graph.nodes.keys())
+
+        for nid in node_ids:
+            node = graph.nodes[nid]
+            # 基础掌握度：基础知识点较高，高阶知识点较低
+            category_map = {0: "基础", 1: "核心", 2: "应用", 3: "高阶"}
+            cat_name = category_map.get(node.category, "核心")
+            category_base = {"基础": 0.75, "核心": 0.65, "应用": 0.55, "高阶": 0.40}
+            base = category_base.get(cat_name, 0.5)
+            # 根据学生ID差异化
+            variation = rng.gauss(0, 0.12)
+            # 受前置知识影响
+            parents = graph.reverse_adj.get(nid, [])
+            parent_influence = 0
+            for p in parents:
+                if p in mastery:
+                    edge = graph.edges.get(f"{p}->{nid}")
+                    if edge:
+                        parent_influence += mastery[p] * edge.causal_strength * 0.15
+            mastery[nid] = round(max(0.1, min(0.95, base + variation + parent_influence)), 3)
+
+        return mastery
+
     def _correlation_matrix(self, data: List[List[float]], n: int) -> List[List[float]]:
         """计算相关系数矩阵"""
         n_samples = len(data)
@@ -961,10 +1027,13 @@ class CausalInferenceEngine:
         """
         graph = self.get_graph(subject)
 
+        # 初始化学生差异化掌握度
+        student_mastery = self.get_student_mastery(student_id, graph)
         if current_mastery:
-            for nid, m in current_mastery.items():
-                if nid in graph.nodes:
-                    graph.nodes[nid].mastery = m
+            student_mastery.update(current_mastery)
+        for nid, m in student_mastery.items():
+            if nid in graph.nodes:
+                graph.nodes[nid].mastery = m
 
         # 收集所有需要学习的节点（目标 + 所有前提）
         all_prerequisites: Set[str] = set(target_nodes)
