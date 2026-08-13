@@ -661,64 +661,119 @@ function exportReport() {
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>${data.title || '因果推理科研报告'}</title>
+<title>因果推理科研报告 - ${subjectName}</title>
 <style>
   body { font-family: "Microsoft YaHei", "SimSun", sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.8; }
   h1 { text-align: center; border-bottom: 2px solid #409EFF; padding-bottom: 10px; }
   .meta { text-align: center; color: #999; font-size: 14px; margin-bottom: 30px; }
   h2 { color: #409EFF; border-left: 4px solid #409EFF; padding-left: 10px; margin-top: 30px; }
+  h3 { color: #606266; margin-top: 20px; }
   table { width: 100%; border-collapse: collapse; margin: 15px 0; }
   th { background: #409EFF; color: white; padding: 8px 12px; text-align: left; }
   td { padding: 8px 12px; border-bottom: 1px solid #eee; }
   tr:hover td { background: #f5f7fa; }
-  .highlight { color: #E6A23C; font-weight: bold; }
-  .strong { color: #67C23A; font-weight: bold; }
-  .weak { color: #909399; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 15px 0; }
+  .stat-card { background: #f5f7fa; padding: 15px; border-radius: 8px; text-align: center; }
+  .stat-card .num { font-size: 28px; font-weight: bold; color: #409EFF; }
+  .stat-card .label { font-size: 13px; color: #999; margin-top: 5px; }
+  .tag { display: inline-block; background: #ecf5ff; color: #409EFF; padding: 2px 10px; border-radius: 4px; font-size: 13px; margin: 3px; }
+  .method-list { padding-left: 20px; }
+  .method-list li { margin: 8px 0; }
+  .innovation-box { background: linear-gradient(135deg, #ecf5ff 0%, #f0f9eb 100%); padding: 20px; border-radius: 8px; margin: 15px 0; }
+  .innovation-box h3 { color: #409EFF; margin-top: 0; }
   .citation { background: #f5f7fa; padding: 15px; border-radius: 8px; margin-top: 30px; font-family: monospace; font-size: 13px; }
   .footer { text-align: center; color: #999; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 15px; }
-  @media print { body { margin: 0; } h2 { page-break-before: auto; } }
+  @media print { body { margin: 0; } .stat-grid { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
 <body>
-<h1>${data.title || '因果推理科研报告'}</h1>
-<p class="meta">学科：${subjectName} | 生成时间：${data.generated_at || new Date().toLocaleString()}</p>`
+<h1>因果推理科研报告</h1>
+<p class="meta">学科：${subjectName} | 报告ID：${data.report_id || '-'} | 生成时间：${data.timestamp || new Date().toLocaleString()}</p>`
 
-  if (data.sections) {
-    for (const sec of data.sections) {
-      html += `<h2>${sec.title}</h2>`
-      if (sec.content) {
-        html += `<p>${sec.content}</p>`
-      }
-      if (sec.items && sec.items.length > 0) {
-        html += '<table><tr>'
-        if (sec.items[0].name) html += '<th>名称</th>'
-        if (sec.items[0].category) html += '<th>类别</th>'
-        if (sec.items[0].difficulty !== undefined) html += '<th>难度</th>'
-        if (sec.items[0].causal_out_degree !== undefined) html += '<th>因果出度</th>'
-        if (sec.items[0].causal_in_degree !== undefined) html += '<th>因果入度</th>'
-        if (sec.items[0].average_causal_strength !== undefined) html += '<th>平均因果强度</th>'
-        if (sec.items[0].root_cause_count !== undefined) html += '<th>作为根因次数</th>'
-        html += '</tr>'
-        for (const item of sec.items) {
-          html += '<tr>'
-          if (item.name) html += `<td>${item.name}</td>`
-          if (item.category) html += `<td>${item.category}</td>`
-          if (item.difficulty !== undefined) html += `<td>${(item.difficulty * 100).toFixed(0)}%</td>`
-          if (item.causal_out_degree !== undefined) html += `<td>${item.causal_out_degree}</td>`
-          if (item.causal_in_degree !== undefined) html += `<td>${item.causal_in_degree}</td>`
-          if (item.average_causal_strength !== undefined) html += `<td>${item.average_causal_strength.toFixed(3)}</td>`
-          if (item.root_cause_count !== undefined) html += `<td>${item.root_cause_count}</td>`
-          html += '</tr>'
-        }
-        html += '</table>'
-      }
-    }
+  // 一、图谱统计
+  const gs = data.graph_statistics
+  if (gs) {
+    html += `
+<h2>一、因果知识图谱统计</h2>
+<div class="stat-grid">
+  <div class="stat-card"><div class="num">${gs.total_nodes || 0}</div><div class="label">知识点节点</div></div>
+  <div class="stat-card"><div class="num">${gs.total_edges || 0}</div><div class="label">因果边</div></div>
+  <div class="stat-card"><div class="num">${((gs.avg_causal_strength || 0) * 100).toFixed(1)}%</div><div class="label">平均因果强度</div></div>
+</div>
+<table>
+  <tr><th>统计项</th><th>数值</th></tr>
+  <tr><td>直接因果边</td><td>${gs.direct_edges || 0}</td></tr>
+  <tr><td>间接因果边</td><td>${gs.indirect_edges || 0}</td></tr>
+  <tr><td>最大因果强度</td><td>${((gs.max_causal_strength || 0) * 100).toFixed(1)}%</td></tr>
+  <tr><td>最小因果强度</td><td>${((gs.min_causal_strength || 0) * 100).toFixed(1)}%</td></tr>
+</table>`
   }
 
-  if (data.citation) {
-    html += `<div class="citation"><strong>引用格式：</strong><p>${data.citation}</p></div>`
+  // 二、关键因果节点
+  const kn = data.key_causal_nodes
+  if (kn && kn.length > 0) {
+    html += `
+<h2>二、关键因果节点分析</h2>
+<p>以下节点对整个知识网络具有最大的因果影响力，是教学干预的关键切入点：</p>
+<table>
+  <tr><th>排名</th><th>知识点</th><th>类别</th><th>下游影响节点数</th><th>总因果效应</th></tr>`
+    kn.forEach((node, i) => {
+      const impactLevel = node.total_causal_impact > 5 ? 'high' : node.total_causal_impact > 2 ? 'mid' : 'low'
+      const impactColor = impactLevel === 'high' ? '#F56C6C' : impactLevel === 'mid' ? '#E6A23C' : '#67C23A'
+      html += `<tr>
+        <td>${i + 1}</td>
+        <td><strong>${node.node_name}</strong></td>
+        <td><span class="tag">${node.category}</span></td>
+        <td>${node.downstream_count} 个</td>
+        <td style="color:${impactColor};font-weight:bold">${(node.total_causal_impact || 0).toFixed(3)}</td>
+      </tr>`
+    })
+    html += `</table>`
   }
-  html += `<div class="footer">EduChat 智能作业批改系统 - 因果推理引擎 自动生成</div></body></html>`
+
+  // 三、诊断统计
+  html += `
+<h2>三、诊断统计</h2>
+<table>
+  <tr><th>统计项</th><th>数值</th></tr>
+  <tr><td>已完成诊断次数</td><td>${data.diagnosis_count || 0}</td></tr>
+</table>`
+
+  // 四、方法论
+  const meth = data.methodology
+  if (meth && meth.length > 0) {
+    html += `
+<h2>四、方法论</h2>
+<p>本系统采用以下因果推理方法：</p>
+<ol class="method-list">`
+    meth.forEach(m => {
+      html += `<li>${m}</li>`
+    })
+    html += `</ol>`
+  }
+
+  // 五、学术贡献
+  const ac = data.academic_contribution
+  if (ac) {
+    html += `
+<h2>五、学术贡献与创新点</h2>
+<div class="innovation-box">
+  <h3>${ac.innovation || ''}</h3>
+  <p><strong>核心方法：</strong>${ac.method || ''}</p>
+  <p><strong>优势：</strong>${ac.advantage || ''}</p>
+  <p><strong>适用学术会议/期刊：</strong></p>
+  <p>${(ac.applicable_venues || []).map(v => `<span class="tag">${v}</span>`).join(' ')}</p>
+</div>`
+  }
+
+  // 引用格式
+  html += `
+<h2>六、引用格式</h2>
+<div class="citation">
+  <p>Wu, T. (2025). EduChat Causal Inference Engine: Integrating Causal Reasoning into Automated Homework Grading. <em>Proceedings of ${ac && ac.applicable_venues ? ac.applicable_venues[0] : 'AIED'}</em>.</p>
+</div>`
+
+  html += `<div class="footer">EduChat 智能作业批改系统 - 因果推理引擎 自动生成 | 报告ID: ${data.report_id || '-'}</div></body></html>`
 
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
