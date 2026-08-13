@@ -68,6 +68,135 @@
         <div class="result-content" v-html="formattedResult"></div>
         <span v-if="loading && result" class="typing-cursor">|</span>
       </div>
+
+      <el-divider />
+
+      <!-- 批量批改 -->
+      <el-collapse>
+        <el-collapse-item title="批量批改（上传 CSV 文件，一次批改多份作业）" name="batch">
+          <el-alert type="info" :closable="false" style="margin-bottom: 12px">
+            CSV 格式要求：第一行为表头，必须包含 <b>content</b> 列（作业内容），可选 <b>subject</b> 列（学科：数学/语文/编程/英语）。
+            每行一份作业，建议不超过 20 份。
+          </el-alert>
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 12px">
+            <el-upload
+              ref="batchUpload"
+              action="#"
+              :auto-upload="false"
+              :limit="1"
+              accept=".csv"
+              :on-change="handleBatchFile"
+              :on-exceed="() => ElMessage.warning('只能上传一个文件')"
+            >
+              <template #trigger>
+                <el-button type="primary" plain>选择 CSV 文件</el-button>
+              </template>
+            </el-upload>
+            <el-button type="success" @click="runBatch" :loading="batchLoading" :disabled="!batchData.length">
+              开始批量批改（{{ batchData.length }} 份）
+            </el-button>
+            <el-button @click="downloadTemplate">下载模板</el-button>
+          </div>
+          <div v-if="batchResults.length" style="margin-top: 12px">
+            <el-table :data="batchResults" border stripe max-height="400" style="width: 100%">
+              <el-table-column type="index" label="序号" width="60" />
+              <el-table-column prop="subject" label="学科" width="80" />
+              <el-table-column prop="content_preview" label="作业内容" show-overflow-tooltip />
+              <el-table-column prop="score" label="评分" width="80">
+                <template #default="{ row }">
+                  <el-tag :type="row.score >= 80 ? 'success' : row.score >= 60 ? 'warning' : 'danger'">
+                    {{ row.score }}分
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="summary" label="批改摘要" show-overflow-tooltip />
+              <el-table-column label="详情" width="80">
+                <template #default="{ row }">
+                  <el-button link type="primary" @click="showBatchDetail(row)">查看</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div style="margin-top: 10px; display: flex; gap: 10px">
+              <el-button size="small" @click="exportBatchCSV">导出结果 (CSV)</el-button>
+              <span style="color: #999; font-size: 12px; line-height: 32px">
+                平均分: {{ batchAvgScore }} | 最高: {{ batchMaxScore }} | 最低: {{ batchMinScore }}
+              </span>
+            </div>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+
+      <!-- 批量批改详情弹窗 -->
+      <el-dialog v-model="batchDetailVisible" title="批改详情" width="600px">
+        <div class="result-content" v-html="batchDetailHtml"></div>
+      </el-dialog>
+
+    </el-card>
+
+    <!-- 批量批改 -->
+    <el-card style="margin-top: 20px;">
+      <template #header>
+        <div class="card-header" @click="batchVisible = !batchVisible" style="cursor: pointer;">
+          <span>📂 批量批改</span>
+          <el-tag type="info" size="small">{{ batchVisible ? '收起' : '展开' }}</el-tag>
+        </div>
+      </template>
+      <el-collapse-transition>
+        <div v-show="batchVisible">
+          <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
+            <p><strong>CSV 格式要求：</strong>第一行为表头，必须包含"作业内容"列，可选"学号""姓名""学科"列。</p>
+            <p>示例：<code>学号,姓名,学科,作业内容</code></p>
+            <p style="margin-top:6px;">
+              <el-link type="primary" href="/batch-template.csv" download>下载 CSV 模板</el-link>
+            </p>
+          </el-alert>
+
+          <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;">
+            <el-upload
+              :auto-upload="false"
+              :show-file-list="true"
+              accept=".csv"
+              :limit="1"
+              :on-change="handleBatchFile"
+              :on-remove="() => batchFile = null"
+            >
+              <el-button type="primary" plain>选择 CSV 文件</el-button>
+            </el-upload>
+            <el-select v-model="batchSubject" style="width: 120px;">
+              <el-option label="数学" value="数学" />
+              <el-option label="语文" value="语文" />
+              <el-option label="编程" value="编程" />
+              <el-option label="英语" value="英语" />
+              <el-option label="通用" value="通用" />
+            </el-select>
+            <el-button type="success" :loading="batchLoading" @click="runBatchGrade">
+              {{ batchLoading ? `批改中 ${batchProgress.done}/${batchProgress.total}` : '开始批量批改' }}
+            </el-button>
+            <el-button v-if="batchResults.length > 0" type="warning" plain @click="exportBatchResults">
+              导出结果 CSV
+            </el-button>
+          </div>
+
+          <!-- 批量批改结果 -->
+          <el-table v-if="batchResults.length > 0" :data="batchResults" border stripe style="width: 100%;">
+            <el-table-column prop="id" label="学号" width="100" />
+            <el-table-column prop="name" label="姓名" width="80" />
+            <el-table-column prop="subject" label="学科" width="70" />
+            <el-table-column prop="score" label="评分" width="70">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'error' ? 'danger' : row.score === '—' ? 'info' : 'success'" size="small">
+                  {{ row.score }}{{ row.score !== '—' ? '分' : '' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="result" label="批改结果" min-width="300">
+              <template #default="{ row }">
+                <div style="max-height: 120px; overflow-y: auto; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">{{ row.result }}</div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </el-collapse-transition>
     </el-card>
   </div>
 </template>
@@ -136,6 +265,112 @@ const clear = () => {
   form.value.content = ''
   uploadedFile.value = null
   result.value = ''
+}
+
+// ============ 批量批改 ============
+const batchVisible = ref(false)
+const batchLoading = ref(false)
+const batchFile = ref(null)
+const batchSubject = ref('数学')
+const batchResults = ref([])
+const batchProgress = ref({ done: 0, total: 0 })
+
+const handleBatchFile = (file) => {
+  batchFile.value = file.raw
+  return false // 阻止自动上传
+}
+
+const parseCSV = (text) => {
+  const lines = text.trim().split('\n')
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim())
+  const results = []
+  for (let i = 1; i < lines.length; i++) {
+    const values = []
+    let current = ''
+    let inQuotes = false
+    for (const ch of lines[i]) {
+      if (ch === '"') { inQuotes = !inQuotes }
+      else if (ch === ',' && !inQuotes) { values.push(current.trim()); current = '' }
+      else { current += ch }
+    }
+    values.push(current.trim())
+    const row = {}
+    headers.forEach((h, idx) => { row[h] = values[idx] || '' })
+    if (row['作业内容'] || row['content']) {
+      results.push({
+        id: row['学号'] || row['id'] || String(i),
+        name: row['姓名'] || row['name'] || `学生${i}`,
+        subject: row['学科'] || row['subject'] || '数学',
+        content: row['作业内容'] || row['content'] || ''
+      })
+    }
+  }
+  return results
+}
+
+const runBatchGrade = async () => {
+  if (!batchFile.value) {
+    ElMessage.warning('请先上传 CSV 文件')
+    return
+  }
+  batchLoading.value = true
+  batchResults.value = []
+  try {
+    const text = await batchFile.value.text()
+    const rows = parseCSV(text)
+    if (rows.length === 0) {
+      ElMessage.error('CSV 文件格式不正确，请确保包含"作业内容"列')
+      batchLoading.value = false
+      return
+    }
+    batchProgress.value = { done: 0, total: rows.length }
+    for (const row of rows) {
+      try {
+        const res = await gradeSync(row.content, 512, batchSubject.value || row.subject)
+        const resultText = res.data.result || ''
+        // 尝试从结果中提取分数
+        const scoreMatch = resultText.match(/总分[：:]\s*(\d+)/)
+        batchResults.value.push({
+          id: row.id,
+          name: row.name,
+          subject: row.subject,
+          score: scoreMatch ? scoreMatch[1] : '—',
+          result: resultText,
+          status: 'success'
+        })
+      } catch (e) {
+        batchResults.value.push({
+          id: row.id,
+          name: row.name,
+          subject: row.subject,
+          score: '—',
+          result: '批改失败: ' + e.message,
+          status: 'error'
+        })
+      }
+      batchProgress.value.done++
+    }
+    ElMessage.success(`批量批改完成！共 ${rows.length} 份`)
+  } catch (e) {
+    ElMessage.error('文件读取失败: ' + e.message)
+  }
+  batchLoading.value = false
+}
+
+const exportBatchResults = () => {
+  const header = '学号,姓名,学科,评分,批改结果\n'
+  const rows = batchResults.value.map(r =>
+    `${r.id},${r.name},${r.subject},${r.score},"${r.result.replace(/"/g, '""').replace(/\n/g, ' ')}"`
+  ).join('\n')
+  const csv = '\uFEFF' + header + rows // BOM for Excel
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `批量批改结果_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 // 将模型输出转为格式化 HTML
