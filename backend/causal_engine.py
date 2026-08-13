@@ -163,6 +163,10 @@ class CausalKnowledgeGraph:
             ("k_function_quadratic", "k_derivative", 0.60, "direct", "二次函数变化率引出导数"),
             ("k_statistics", "k_derivative", 0.25, "indirect", "统计思维辅助理解变化趋势"),
             ("k_inequality", "k_function_quadratic", 0.35, "indirect", "不等式与函数值域关联"),
+            # 汇聚边：使部分节点对同时存在直接和间接因果路径
+            ("k_arithmetic", "k_algebra_basic", 0.50, "direct", "算术运算直接迁移到代数思维"),
+            ("k_algebra_basic", "k_function_quadratic", 0.30, "direct", "代数思维直接辅助二次函数理解"),
+            ("k_equation_linear", "k_function_linear", 0.45, "direct", "一元一次方程与一次函数互为表里"),
         ]
 
         for src, tgt, strength, etype, desc in edges_def:
