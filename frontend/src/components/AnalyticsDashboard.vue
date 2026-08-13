@@ -12,7 +12,7 @@
                   <el-input-number v-model="batchSize" :min="10" :max="200" :step="10" />
                 </el-form-item>
                 <el-form-item label="学科">
-                  <el-select v-model="selectedSubject">
+                  <el-select v-model="selectedSubject" style="width: 140px">
                     <el-option label="数学" value="math" />
                     <el-option label="语文" value="chinese" />
                     <el-option label="编程" value="programming" />
