@@ -331,7 +331,7 @@ class CausalKnowledgeGraph:
     def get_graph_data(self) -> Dict:
         """获取图谱可视化数据"""
         nodes = []
-        categories = {"基础": 0, "核心": 1, "进阶": 2}
+        categories = {"基础": 0, "核心": 1, "进阶": 2, "高阶": 3, "应用": 2}
         for nid, node in self.nodes.items():
             nodes.append({
                 "id": nid,
@@ -340,6 +340,7 @@ class CausalKnowledgeGraph:
                 "category_name": node.category,
                 "difficulty": node.difficulty,
                 "symbolSize": 20 + node.difficulty * 30,
+                "description": node.description,
             })
 
         links = []
