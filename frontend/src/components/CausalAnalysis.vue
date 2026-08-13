@@ -47,7 +47,6 @@
                   <el-descriptions-item label="描述">
                     {{ selectedNode.description || '暂无描述' }}
                   </el-descriptions-item>
-                  <el-descriptions-item label="描述">{{ selectedNode.description }}</el-descriptions-item>
                 </el-descriptions>
                 <el-divider content-position="center">因果关系</el-divider>
                 <div v-if="nodeRelations.length" class="relation-list">
@@ -426,20 +425,24 @@ function renderGraph() {
     }
   })
 
-  const edges = (graphData.value.edges || []).map(e => ({
-    source: e.source,
-    target: e.target,
-    lineStyle: {
-      width: 1 + Math.abs(e.value || e.weight || 0.5) * 4,
-      color: (e.value || e.weight || 0.5) > 0 ? '#409eff' : '#f56c6c',
-      curveness: 0.2,
-    },
-    label: {
-      show: true,
-      formatter: (e.value || e.weight || 0.5).toFixed(2),
-      fontSize: 9,
-    },
-  }))
+  const edges = (graphData.value.links || graphData.value.edges || []).map(e => {
+    const strength = e.value ?? e.weight ?? 0.5
+    return {
+      source: e.source,
+      target: e.target,
+      lineStyle: {
+        width: 1 + Math.abs(strength) * 4,
+        color: strength > 0 ? '#409eff' : '#f56c6c',
+        curveness: 0.2,
+        opacity: 0.7,
+      },
+      label: {
+        show: true,
+        formatter: strength.toFixed(2),
+        fontSize: 9,
+      },
+    }
+  })
 
   graphChart.setOption({
     tooltip: {
@@ -480,16 +483,16 @@ function selectNode(nodeId) {
   const node = (graphData.value.nodes || []).find(n => n.id === nodeId)
   if (!node) return
   selectedNode.value = node
-  const edges = graphData.value.edges || []
+  const edges = graphData.value.links || graphData.value.edges || []
   nodeRelations.value = []
   edges.forEach(e => {
     if (e.source === nodeId) {
       const t = graphData.value.nodes.find(n => n.id === e.target)
-      nodeRelations.value.push({ type: 'cause', name: t?.name || e.target, weight: e.value || e.weight, target: e.target })
+      nodeRelations.value.push({ type: 'cause', name: t?.name || e.target, weight: e.value || e.weight || 0, target: e.target })
     }
     if (e.target === nodeId) {
       const s = graphData.value.nodes.find(n => n.id === e.source)
-      nodeRelations.value.push({ type: 'caused', name: s?.name || e.source, weight: e.value || e.weight, target: e.source })
+      nodeRelations.value.push({ type: 'caused', name: s?.name || e.source, weight: e.value || e.weight || 0, target: e.source })
     }
   })
 }
