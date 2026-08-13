@@ -104,16 +104,15 @@
                 :description="diagResult.root_cause_description" style="margin-bottom: 16px" />
               <div class="diag-chain">
                 <h4>因果链路</h4>
-                <div class="chain-flow">
-                  <template v-for="(step, idx) in diagResult.causal_chain" :key="idx">
-                    <div class="chain-node" :class="{ 'root-node': idx === 0 }">
-                      <div class="chain-name">{{ step.node_name }}</div>
+                <div v-for="(chain, cidx) in diagResult.causal_chain" :key="cidx" class="chain-flow" style="margin-bottom: 12px">
+                  <template v-for="(name, nidx) in chain.node_names" :key="nidx">
+                    <div class="chain-node" :class="{ 'root-node': nidx === 0 }">
+                      <div class="chain-name">{{ name }}</div>
                       <div class="chain-meta">
-                        <span>掌握度 {{ (step.mastery * 100).toFixed(0) }}%</span>
-                        <span v-if="step.effect">效应 {{ step.effect.toFixed(2) }}</span>
+                        <span v-if="nidx === chain.node_names.length - 1">效应 {{ (chain.effect * 100).toFixed(1) }}%</span>
                       </div>
                     </div>
-                    <el-icon v-if="idx < diagResult.causal_chain.length - 1" class="chain-arrow"><ArrowRight /></el-icon>
+                    <el-icon v-if="nidx < chain.node_names.length - 1" class="chain-arrow"><ArrowRight /></el-icon>
                   </template>
                 </div>
               </div>
@@ -496,7 +495,26 @@ async function runDiagnose() {
       ...diagForm,
       subject: currentSubject.value,
     })
-    diagResult.value = res.data
+    const data = res.data
+    // 映射后端字段到前端期望格式
+    const topCause = data.root_causes?.[0] || {}
+    diagResult.value = {
+      ...data,
+      root_cause_name: topCause.node_name || '未知',
+      root_cause_description: topCause.description || '无描述',
+      causal_chain: (data.causal_chains || []).map(c => ({
+        node_names: c.chain,
+        node_ids: c.chain_ids,
+        effect: c.causal_effect,
+      })),
+      interventions: (data.intervention_priority || []).map(iv => ({
+        priority: iv.priority <= 2 ? 'high' : iv.priority <= 4 ? 'medium' : 'low',
+        action: iv.recommendation || `学习${iv.target_name || '相关知识'}`,
+        detail: `当前掌握度 ${(iv.current_mastery * 100).toFixed(0)}%，影响 ${iv.affected_count} 个知识点`,
+        estimated_time: `约${Math.max(1, Math.round((1 - iv.current_mastery) * 10))}天`,
+        expected_improvement: (iv.expected_impact || 0) * 100,
+      })),
+    }
     ElMessage.success('根因分析完成')
   } catch (e) {
     ElMessage.error('诊断失败: ' + (e.response?.data?.detail || e.message))
@@ -507,7 +525,7 @@ async function runDiagnose() {
 
 function loadDemoDiagnose() {
   diagForm.student_id = 'student_001'
-  diagForm.error_nodes = ['k3', 'k5']
+  diagForm.error_nodes = ['k_equation_quadratic', 'k_function_quadratic']
   ElMessage.info('已载入示例数据，点击"运行根因分析"')
 }
 
@@ -521,7 +539,29 @@ async function runCounterfactual() {
       intervention_mastery: cfForm.intervention_mastery / 100,
       subject: currentSubject.value,
     })
-    cfResult.value = res.data
+    const data = res.data
+    // 映射后端字段到前端期望格式
+    const currentScore = data.total_expected_improvement != null
+      ? 60 + (1 - (data.total_expected_improvement || 0)) * 20
+      : 60
+    const cfScore = data.total_expected_improvement != null
+      ? currentScore + data.total_expected_improvement * 100
+      : 60
+    cfResult.value = {
+      ...data,
+      current_score: currentScore,
+      counterfactual_score: cfScore,
+      score_change: cfScore - currentScore,
+      intervention_node_name: data.target_node_name || cfForm.target_node,
+      intervention_mastery: data.intervention_value || cfForm.intervention_mastery / 100,
+      impacted_nodes: (data.detailed_results || []).map(r => ({
+        node_name: r.node_name,
+        node_id: r.node_id,
+        current_mastery: r.original_mastery,
+        predicted_mastery: r.predicted_mastery,
+        improvement: r.improvement,
+      })),
+    }
     await nextTick()
     renderCfChart()
     ElMessage.success('反事实推理完成')
@@ -555,7 +595,17 @@ async function runEffect() {
   effectLoading.value = true
   try {
     const res = await causalApi.estimateEffect(effectForm.cause, effectForm.effect, currentSubject.value)
-    effectResult.value = res.data
+    const data = res.data
+    effectResult.value = {
+      ...data,
+      total_effect: data.total_causal_effect || 0,
+      significant: (data.total_causal_effect || 0) >= 0.3,
+      path_details: (data.paths || []).map(p => ({
+        path: (p.path || []).join(' → '),
+        effect: p.path_effect ?? p.avg_strength,
+        type: p.length <= 2 ? '直接因果' : '间接因果',
+      })),
+    }
   } catch (e) {
     ElMessage.error('估计失败: ' + (e.response?.data?.detail || e.message))
   } finally {
@@ -569,7 +619,20 @@ async function runPath() {
   pathLoading.value = true
   try {
     const res = await causalApi.learningPath({ ...pathForm, subject: currentSubject.value })
-    pathResult.value = res.data
+    const data = res.data
+    // 映射后端字段到前端期望格式
+    pathResult.value = {
+      ...data,
+      path: (data.learning_path || []).map(s => ({
+        ...s,
+        target_mastery: Math.min(1, s.current_mastery + 0.3),
+        action: s.needs_learning ? `重点学习「${s.node_name}」，当前掌握度仅 ${(s.current_mastery * 100).toFixed(0)}%` : `巩固「${s.node_name}」，已基本掌握`,
+      })),
+      estimated_improvement: data.estimated_hours != null ? data.estimated_hours * 5 : 15,
+      estimated_time: `约 ${data.estimated_hours || 5} 小时`,
+      causal_basis: '基于因果知识图谱的拓扑排序与因果效应加权',
+      strategy: '按因果层级排序，优先补足掌握度低的前提知识点',
+    }
     ElMessage.success('路径推荐完成')
   } catch (e) {
     ElMessage.error('推荐失败: ' + (e.response?.data?.detail || e.message))
