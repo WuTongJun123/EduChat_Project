@@ -521,9 +521,9 @@ async function runDiagnose() {
       interventions: (data.intervention_priority || []).map(iv => ({
         priority: iv.priority <= 2 ? 'high' : iv.priority <= 4 ? 'medium' : 'low',
         action: iv.recommendation || `学习${iv.target_name || '相关知识'}`,
-        detail: `当前掌握度 ${(iv.current_mastery * 100).toFixed(0)}%，影响 ${iv.affected_count} 个知识点`,
+        detail: `当前掌握度 ${(iv.current_mastery * 100).toFixed(0)}%，影响 ${iv.affected_count} 个下游知识点`,
         estimated_time: `约${Math.max(1, Math.round((1 - iv.current_mastery) * 10))}天`,
-        expected_improvement: (iv.expected_impact || 0) * 100,
+        expected_improvement: Math.round(iv.affected_count * 15 + iv.current_mastery * 20),
       })),
     }
     ElMessage.success('根因分析完成')
@@ -627,7 +627,7 @@ async function runPath() {
         target_mastery: Math.min(1, s.current_mastery + 0.3),
         action: s.needs_learning ? `重点学习「${s.node_name}」，当前掌握度仅 ${(s.current_mastery * 100).toFixed(0)}%` : `巩固「${s.node_name}」，已基本掌握`,
       })),
-      estimated_improvement: data.estimated_hours != null ? data.estimated_hours * 5 : 15,
+      estimated_improvement: Math.round((data.steps_needs_learning || 0) * 12),
       estimated_time: `约 ${data.estimated_hours || 5} 小时`,
       causal_basis: '基于因果知识图谱的拓扑排序与因果效应加权',
       strategy: '按因果层级排序，优先补足掌握度低的前提知识点',
