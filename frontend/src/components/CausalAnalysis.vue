@@ -39,13 +39,13 @@
                 <el-descriptions :column="1" border size="small">
                   <el-descriptions-item label="知识点">{{ selectedNode.name }}</el-descriptions-item>
                   <el-descriptions-item label="类别">
-                    <el-tag size="small">{{ selectedNode.category }}</el-tag>
+                    <el-tag size="small">{{ selectedNode.category_name || selectedNode.category }}</el-tag>
                   </el-descriptions-item>
                   <el-descriptions-item label="难度">
-                    <el-rate :model-value="selectedNode.difficulty" disabled size="small" />
+                    <el-progress :percentage="Math.round((selectedNode.difficulty || 0) * 100)" :stroke-width="10" />
                   </el-descriptions-item>
-                  <el-descriptions-item label="掌握度">
-                    <el-progress :percentage="Math.round(selectedNode.mastery * 100)" :color="masteryColor(selectedNode.mastery)" />
+                  <el-descriptions-item label="描述">
+                    {{ selectedNode.description || '暂无描述' }}
                   </el-descriptions-item>
                   <el-descriptions-item label="描述">{{ selectedNode.description }}</el-descriptions-item>
                 </el-descriptions>
@@ -401,37 +401,42 @@ function renderGraph() {
   graphChart = echarts.init(graphChartRef.value)
 
   const categories = [
-    { name: '基础概念' },
-    { name: '运算技能' },
-    { name: '应用能力' },
-    { name: '高阶思维' },
+    { name: '基础', itemStyle: { color: '#5470c6' } },
+    { name: '核心', itemStyle: { color: '#ee6666' } },
+    { name: '应用', itemStyle: { color: '#91cc75' } },
+    { name: '高阶', itemStyle: { color: '#fac898' } },
   ]
-  const catMap = { '基础概念': 0, '运算技能': 1, '应用能力': 2, '高阶思维': 3 }
+  const catMap = { '基础': 0, '核心': 1, '应用': 2, '高阶': 3 }
+  const catColors = ['#5470c6', '#ee6666', '#91cc75', '#fac898']
 
-  const nodes = (graphData.value.nodes || []).map(n => ({
-    id: n.id,
-    name: n.name,
-    symbolSize: 20 + n.difficulty * 12,
-    category: catMap[n.category] ?? 0,
-    itemStyle: {
-      color: masteryColor(n.mastery),
-      opacity: 0.85,
-    },
-    label: { show: true, fontSize: 11 },
-    value: n.mastery,
-  }))
+  const nodes = (graphData.value.nodes || []).map(n => {
+    const catIdx = catMap[n.category_name] ?? catMap[n.category_name?.replace('概念', '')] ?? 0
+    return {
+      id: n.id,
+      name: n.name,
+      symbolSize: 20 + (n.difficulty || 0.3) * 12,
+      category: catIdx,
+      itemStyle: {
+        color: catColors[catIdx],
+        opacity: 0.85,
+      },
+      label: { show: true, fontSize: 11 },
+      value: n.difficulty || 0.3,
+      rawData: n,
+    }
+  })
 
   const edges = (graphData.value.edges || []).map(e => ({
     source: e.source,
     target: e.target,
     lineStyle: {
-      width: 1 + Math.abs(e.weight) * 4,
-      color: e.weight > 0 ? '#409eff' : '#f56c6c',
+      width: 1 + Math.abs(e.value || e.weight || 0.5) * 4,
+      color: (e.value || e.weight || 0.5) > 0 ? '#409eff' : '#f56c6c',
       curveness: 0.2,
     },
     label: {
       show: true,
-      formatter: e.weight?.toFixed(2),
+      formatter: (e.value || e.weight || 0.5).toFixed(2),
       fontSize: 9,
     },
   }))
@@ -439,7 +444,10 @@ function renderGraph() {
   graphChart.setOption({
     tooltip: {
       formatter: (p) => {
-        if (p.dataType === 'node') return `${p.data.name}<br/>掌握度: ${(p.data.value * 100).toFixed(0)}%`
+        if (p.dataType === 'node') {
+          const raw = p.data.rawData || {}
+          return `${p.data.name}<br/>类别: ${raw.category_name || ''}<br/>难度: ${((raw.difficulty || 0) * 100).toFixed(0)}%`
+        }
         if (p.dataType === 'edge') return `因果效应: ${p.data.label?.formatter || ''}`
         return p.name
       },
@@ -477,11 +485,11 @@ function selectNode(nodeId) {
   edges.forEach(e => {
     if (e.source === nodeId) {
       const t = graphData.value.nodes.find(n => n.id === e.target)
-      nodeRelations.value.push({ type: 'cause', name: t?.name || e.target, weight: e.weight, target: e.target })
+      nodeRelations.value.push({ type: 'cause', name: t?.name || e.target, weight: e.value || e.weight, target: e.target })
     }
     if (e.target === nodeId) {
       const s = graphData.value.nodes.find(n => n.id === e.source)
-      nodeRelations.value.push({ type: 'caused', name: s?.name || e.source, weight: e.weight, target: e.source })
+      nodeRelations.value.push({ type: 'caused', name: s?.name || e.source, weight: e.value || e.weight, target: e.source })
     }
   })
 }
