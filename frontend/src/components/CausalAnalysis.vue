@@ -653,14 +653,81 @@ async function loadReport() {
 }
 
 function exportReport() {
-  const blob = new Blob([JSON.stringify(reportData.value, null, 2)], { type: 'application/json' })
+  const data = reportData.value
+  const subjectMap = { math: '数学', chinese: '语文', programming: '编程' }
+  const subjectName = subjectMap[currentSubject.value] || currentSubject.value
+
+  let html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>${data.title || '因果推理科研报告'}</title>
+<style>
+  body { font-family: "Microsoft YaHei", "SimSun", sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.8; }
+  h1 { text-align: center; border-bottom: 2px solid #409EFF; padding-bottom: 10px; }
+  .meta { text-align: center; color: #999; font-size: 14px; margin-bottom: 30px; }
+  h2 { color: #409EFF; border-left: 4px solid #409EFF; padding-left: 10px; margin-top: 30px; }
+  table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+  th { background: #409EFF; color: white; padding: 8px 12px; text-align: left; }
+  td { padding: 8px 12px; border-bottom: 1px solid #eee; }
+  tr:hover td { background: #f5f7fa; }
+  .highlight { color: #E6A23C; font-weight: bold; }
+  .strong { color: #67C23A; font-weight: bold; }
+  .weak { color: #909399; }
+  .citation { background: #f5f7fa; padding: 15px; border-radius: 8px; margin-top: 30px; font-family: monospace; font-size: 13px; }
+  .footer { text-align: center; color: #999; font-size: 12px; margin-top: 40px; border-top: 1px solid #eee; padding-top: 15px; }
+  @media print { body { margin: 0; } h2 { page-break-before: auto; } }
+</style>
+</head>
+<body>
+<h1>${data.title || '因果推理科研报告'}</h1>
+<p class="meta">学科：${subjectName} | 生成时间：${data.generated_at || new Date().toLocaleString()}</p>`
+
+  if (data.sections) {
+    for (const sec of data.sections) {
+      html += `<h2>${sec.title}</h2>`
+      if (sec.content) {
+        html += `<p>${sec.content}</p>`
+      }
+      if (sec.items && sec.items.length > 0) {
+        html += '<table><tr>'
+        if (sec.items[0].name) html += '<th>名称</th>'
+        if (sec.items[0].category) html += '<th>类别</th>'
+        if (sec.items[0].difficulty !== undefined) html += '<th>难度</th>'
+        if (sec.items[0].causal_out_degree !== undefined) html += '<th>因果出度</th>'
+        if (sec.items[0].causal_in_degree !== undefined) html += '<th>因果入度</th>'
+        if (sec.items[0].average_causal_strength !== undefined) html += '<th>平均因果强度</th>'
+        if (sec.items[0].root_cause_count !== undefined) html += '<th>作为根因次数</th>'
+        html += '</tr>'
+        for (const item of sec.items) {
+          html += '<tr>'
+          if (item.name) html += `<td>${item.name}</td>`
+          if (item.category) html += `<td>${item.category}</td>`
+          if (item.difficulty !== undefined) html += `<td>${(item.difficulty * 100).toFixed(0)}%</td>`
+          if (item.causal_out_degree !== undefined) html += `<td>${item.causal_out_degree}</td>`
+          if (item.causal_in_degree !== undefined) html += `<td>${item.causal_in_degree}</td>`
+          if (item.average_causal_strength !== undefined) html += `<td>${item.average_causal_strength.toFixed(3)}</td>`
+          if (item.root_cause_count !== undefined) html += `<td>${item.root_cause_count}</td>`
+          html += '</tr>'
+        }
+        html += '</table>'
+      }
+    }
+  }
+
+  if (data.citation) {
+    html += `<div class="citation"><strong>引用格式：</strong><p>${data.citation}</p></div>`
+  }
+  html += `<div class="footer">EduChat 智能作业批改系统 - 因果推理引擎 自动生成</div></body></html>`
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `causal_report_${currentSubject.value}_${Date.now()}.json`
+  a.download = `因果推理报告_${subjectName}_${new Date().toLocaleDateString().replace(/\//g, '-')}.html`
   a.click()
   URL.revokeObjectURL(url)
-  ElMessage.success('报告已导出')
+  ElMessage.success('报告已导出为 HTML，可用浏览器打开或打印为 PDF')
 }
 
 async function loadAll() {
