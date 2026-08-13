@@ -601,7 +601,7 @@ async function runEffect() {
       direct_effect: data.direct_causal_effect || 0,
       indirect_effect: data.indirect_causal_effect || 0,
       significant: (data.total_causal_effect || 0) >= 0.3,
-      path_details: (data.causal_paths || []).map(p => ({
+      path_details: (data.paths || []).map(p => ({
         path: (p.path || []).join(' → '),
         effect: p.path_effect ?? p.avg_strength,
         type: p.is_direct ? '直接因果' : '间接因果',
