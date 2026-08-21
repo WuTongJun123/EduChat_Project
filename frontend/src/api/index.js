@@ -8,19 +8,22 @@ const api = axios.create({
 // ==================== 基础批改API ====================
 
 // 同步批改
-export const gradeSync = (content, maxTokens = 1024, subject = null, temperature = null, promptType = null) => {
+export const gradeSync = (content, maxTokens = 1024, subject = null, temperature = null, promptType = null, detailLevel = null) => {
   const data = { content, max_tokens: maxTokens, subject }
   if (temperature !== null) data.temperature = temperature
   if (promptType) data.prompt_type = promptType
+  if (detailLevel) data.detail_level = detailLevel
   return api.post('/grade/sync', data)
 }
 
 // 流式批改（使用 fetch + ReadableStream）
-export const gradeStreamFetch = async (content, maxTokens, onChunk, subject = null) => {
+export const gradeStreamFetch = async (content, maxTokens, onChunk, subject = null, detailLevel = null) => {
+  const body = { content, max_tokens: maxTokens, subject }
+  if (detailLevel) body.detail_level = detailLevel
   const response = await fetch('/api/grade/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content, max_tokens: maxTokens, subject })
+    body: JSON.stringify(body)
   })
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
@@ -42,11 +45,12 @@ export const gradeStreamFetch = async (content, maxTokens, onChunk, subject = nu
 }
 
 // 文件上传批改
-export const gradeFile = async (file, maxTokens = 1024, subject = null) => {
+export const gradeFile = async (file, maxTokens = 1024, subject = null, detailLevel = null) => {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('max_tokens', maxTokens)
   if (subject) formData.append('subject', subject)
+  if (detailLevel) formData.append('detail_level', detailLevel)
   
   return api.post('/grade/file', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

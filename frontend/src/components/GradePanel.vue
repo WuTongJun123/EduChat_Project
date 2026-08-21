@@ -56,6 +56,7 @@
           <el-radio-button label="brief">简洁</el-radio-button>
           <el-radio-button label="normal">标准</el-radio-button>
           <el-radio-button label="detailed">详细</el-radio-button>
+          <el-radio-button label="deep">深度</el-radio-button>
         </el-radio-group>
         <span style="color: #909399; font-size: 12px; margin-left: 12px;">{{ detailHint }}</span>
       </div>
@@ -119,10 +120,10 @@ const form = ref({
 })
 const detailLevel = ref('normal')
 const detailHint = computed(() => {
-  const hints = { brief: '只给分数和简短评语', normal: '评分 + 错误分析 + 学习建议', detailed: '详细分析每一步 + 多角度建议' }
+  const hints = { brief: '只给分数和简短评语', normal: '评分 + 错误分析 + 学习建议', detailed: '详细分析每一步 + 多角度建议', deep: '深度分析 + 逐项评分 + 知识拓展' }
   return hints[detailLevel.value] || ''
 })
-const maxTokensByLevel = { brief: 256, normal: 512, detailed: 1024 }
+const maxTokensByLevel = { brief: 256, normal: 512, detailed: 1024, deep: 2048 }
 const loading = ref(false)
 const result = ref('')
 const uploadedFile = ref(null)
@@ -167,12 +168,12 @@ const handleGrade = async () => {
 
   try {
     if (uploadedFile.value) {
-      const res = await gradeFile(uploadedFile.value, maxTokensByLevel[detailLevel.value], form.value.subject)
+      const res = await gradeFile(uploadedFile.value, maxTokensByLevel[detailLevel.value], form.value.subject, detailLevel.value)
       result.value = res.data.result
     } else {
       await gradeStreamFetch(form.value.content, maxTokensByLevel[detailLevel.value], (chunk) => {
         result.value += chunk
-      }, form.value.subject)
+      }, form.value.subject, detailLevel.value)
     }
   } catch (error) {
     ElMessage.error('批改失败：' + (error.response?.data?.detail || error.message))
@@ -264,7 +265,7 @@ const runBatchGrade = async (file, fileName) => {
 
       for (const row of rows) {
         try {
-          const res = await gradeSync(row.content, maxTokensByLevel[detailLevel.value], form.value.subject || row.subject)
+          const res = await gradeSync(row.content, maxTokensByLevel[detailLevel.value], form.value.subject || row.subject, null, null, detailLevel.value)
           const resultText = res.data.result || ''
           const scoreMatch = resultText.match(/总分[：:]\s*(\d+)/)
           batchResults.value.push({

@@ -234,15 +234,56 @@ Step 6 - 生成建议：针对每个错误给出具体改进方法
 }
 
 
-def _get_system_prompt(subject: Optional[str] = None, prompt_type: Optional[str] = None) -> str:
-    """根据学科和prompt类型获取对应的系统提示词"""
+# 详细程度追加指令
+DETAIL_LEVEL_INSTRUCTIONS = {
+    "brief": """
+
+【反馈详细程度：简洁】
+请精简输出，每部分不超过1-2句话。错误分析只需一句话概括，学习建议1条即可。整体控制在3-5行内。""",
+
+    "normal": """
+
+【反馈详细程度：标准】
+请按标准详细程度输出：整体评价2-3句、错误分析逐条列出、学习建议2-3条。确保反馈信息完整且可操作。""",
+
+    "detailed": """
+
+【反馈详细程度：详细】
+请非常详细地输出批改反馈：
+- 整体评价：从多个维度（思路、方法、计算、格式等）逐一点评，每维度至少2句
+- 错误分析：即使无错误，也要详细说明为什么每一步都是正确的，逐步验证；如果有错误，逐一引用原文并给出正确解法的完整推导过程
+- 评分：按维度逐项列出扣分/加分理由，给出分项得分表
+- 学习建议：提供3-5条具体建议，每条附带推荐练习方向或参考资源
+- 鼓励性结尾：结合具体表现给予有针对性的鼓励
+请确保内容充实丰富，总输出不少于500字。""",
+
+    "deep": """
+
+【反馈详细程度：深度分析】
+请进行深度、全面的批改分析：
+- 整体评价：从知识掌握、解题策略、计算准确性、逻辑严密性、表达规范性等多维度深入分析，每维度3句以上
+- 错误分析：逐步验证每一个步骤，对正确的步骤说明其原理和依据，对错误的步骤给出完整的正确推导过程；分析错误产生的根本原因（概念混淆、计算失误、逻辑跳跃等）
+- 评分：给出分项评分表（含权重、得分、扣分理由），并与满分答案进行对比说明
+- 学习建议：5条以上具体建议，每条包含问题描述、改进方法、推荐练习、预期提升效果
+- 鼓励性结尾：结合本次作业表现和进步方向给予个性化鼓励
+- 知识拓展：指出本题涉及的核心知识点，推荐相关进阶内容
+请确保分析深入透彻，总输出不少于800字。"""
+}
+
+
+def _get_system_prompt(subject: Optional[str] = None, prompt_type: Optional[str] = None, detail_level: Optional[str] = None) -> str:
+    """根据学科、prompt类型和详细程度获取对应的系统提示词"""
     base_prompt = SYSTEM_PROMPT
     if subject and subject in SUBJECT_PROMPTS:
         base_prompt = SUBJECT_PROMPTS[subject]
 
     # 如果指定了 prompt_type 变体，追加到基础提示词
     if prompt_type and prompt_type in PROMPT_VARIANTS and PROMPT_VARIANTS[prompt_type]:
-        return base_prompt + PROMPT_VARIANTS[prompt_type]
+        base_prompt = base_prompt + PROMPT_VARIANTS[prompt_type]
+
+    # 追加详细程度指令
+    if detail_level and detail_level in DETAIL_LEVEL_INSTRUCTIONS:
+        base_prompt = base_prompt + DETAIL_LEVEL_INSTRUCTIONS[detail_level]
 
     return base_prompt
 
@@ -317,9 +358,9 @@ def _load_model():
         _model_loading = False
 
 
-def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None) -> str:
+def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None, detail_level: Optional[str] = None) -> str:
     """同步批改作业"""
-    system_prompt = _get_system_prompt(subject, prompt_type)
+    system_prompt = _get_system_prompt(subject, prompt_type, detail_level)
 
     if DEMO_MODE:
         subject_label = f"【{subject}】" if subject else ""
@@ -381,9 +422,9 @@ def grade_sync(content: str, max_tokens: int = 1024, subject: Optional[str] = No
         return f"模型推理失败：{str(e)}\n\n请检查模型文件是否存在，或设置环境变量 EDUCHAT_DEMO_MODE=true 使用演示模式"
 
 
-def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None) -> Generator[str, None, None]:
+def grade_stream(content: str, max_tokens: int = 1024, subject: Optional[str] = None, temperature: Optional[float] = None, prompt_type: Optional[str] = None, detail_level: Optional[str] = None) -> Generator[str, None, None]:
     """流式批改作业，返回生成器"""
-    system_prompt = _get_system_prompt(subject, prompt_type)
+    system_prompt = _get_system_prompt(subject, prompt_type, detail_level)
 
     if DEMO_MODE:
         demo_result = grade_sync(content, max_tokens, subject)
